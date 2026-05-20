@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  CANCELLED
+}
+
+enum TicketCategory {
+  ACADEMIC
+  TECHNICAL
+  CAREER
+  OTHER
+}
+
+model User {
+  id          String   @id @default(cuid())
+  maxUserId   String   @unique
+  displayName String?
+  role        Role     @default(STUDENT)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  consent          Consent?
+  userState        UserState?
+  ticketsAsStudent Ticket[] @relation("StudentTickets")
+  ticketsAsTeacher Ticket[] @relation("TeacherTickets")
+}
+
+model Consent {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentsVersion String
+  acceptedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model UserState {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  state     String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ticket {
+  id           String         @id @default(cuid())
+  ticketNumber Int            @unique @default(autoincrement())
+  studentId    String
+  student      User           @relation("StudentTickets", fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId    String?
+  teacher      User?          @relation("TeacherTickets", fields: [teacherId], references: [id], onDelete: SetNull)
+  category     TicketCategory
+  status       TicketStatus   @default(OPEN)
+  description  String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
