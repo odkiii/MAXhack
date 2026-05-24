@@ -29,28 +29,28 @@ function buildTicketSummary(payload) {
 Подтвердите создание тикета или отмените.`;
 }
 
-async function showMainMenu(chatId, displayName) {
+async function showMainMenu(recipient, displayName) {
   await MaxService.sendMessage(
-    chatId,
+    recipient,
     `Главное меню. Здравствуйте, ${displayName ?? "студент"}!`,
     getStudentMenuKeyboard(),
   );
 }
 
 export async function callbackHandler(ctx) {
-  const { user, chatId, data } = ctx;
+  const { user, recipient, data } = ctx;
 
   if (data === "accept_consent") {
     await ConsentService.accept(user.id);
     await StateService.clear(user.id);
-    await showMainMenu(chatId, user.displayName);
+    await showMainMenu(recipient, user.displayName);
     return;
   }
 
   if (data === "create_ticket") {
     await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, {});
     await MaxService.sendMessage(
-      chatId,
+      recipient,
       "Выберите преподавателя для консультации:",
       getTeacherSelectionKeyboard(),
     );
@@ -61,7 +61,7 @@ export async function callbackHandler(ctx) {
     const teacherMeta = getTeacherByKey(data);
 
     if (!teacherMeta) {
-      await MaxService.sendMessage(chatId, "Преподаватель не найден.");
+      await MaxService.sendMessage(recipient, "Преподаватель не найден.");
       return;
     }
 
@@ -76,7 +76,7 @@ export async function callbackHandler(ctx) {
     });
 
     await MaxService.sendMessage(
-      chatId,
+      recipient,
       "Выберите категорию обращения:",
       getCategoriesKeyboard(),
     );
@@ -87,7 +87,7 @@ export async function callbackHandler(ctx) {
     const category = data.replace("category_", "");
 
     if (!Object.values(TICKET_CATEGORIES).includes(category)) {
-      await MaxService.sendMessage(chatId, "Некорректная категория.");
+      await MaxService.sendMessage(recipient, "Некорректная категория.");
       return;
     }
 
@@ -99,7 +99,7 @@ export async function callbackHandler(ctx) {
     });
 
     await MaxService.sendMessage(
-      chatId,
+      recipient,
       "Опишите ваш вопрос одним сообщением:",
     );
     return;
@@ -109,13 +109,16 @@ export async function callbackHandler(ctx) {
     const { state, payload } = await StateService.get(user.id);
 
     if (state !== FSM_STATES.WAITING_CONFIRMATION) {
-      await MaxService.sendMessage(chatId, "Нет активного тикета для подтверждения.");
+      await MaxService.sendMessage(
+        recipient,
+        "Нет активного тикета для подтверждения.",
+      );
       return;
     }
 
     if (!payload.teacherId || !payload.category || !payload.description) {
       await MaxService.sendMessage(
-        chatId,
+        recipient,
         "Не хватает данных для создания тикета. Начните заново через /start.",
       );
       await StateService.clear(user.id);
@@ -134,7 +137,7 @@ export async function callbackHandler(ctx) {
     const teacher = getTeacherByKey(payload.teacherKey);
 
     await MaxService.sendMessage(
-      chatId,
+      recipient,
       `Тикет #${ticket.ticketNumber} создан.
 
 Преподаватель: ${teacher?.displayName ?? "—"}
@@ -149,10 +152,13 @@ export async function callbackHandler(ctx) {
 
   if (data === "cancel_ticket") {
     await StateService.clear(user.id);
-    await MaxService.sendMessage(chatId, "Создание тикета отменено.");
-    await showMainMenu(chatId, user.displayName);
+    await MaxService.sendMessage(recipient, "Создание тикета отменено.");
+    await showMainMenu(recipient, user.displayName);
     return;
   }
 
-  await MaxService.sendMessage(chatId, "Неизвестное действие. Используйте /start.");
+  await MaxService.sendMessage(
+    recipient,
+    "Неизвестное действие. Используйте /start.",
+  );
 }

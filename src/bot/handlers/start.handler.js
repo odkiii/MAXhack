@@ -16,7 +16,7 @@ export async function startHandler(ctx) {
 
   if (!hasConsent) {
     await MaxService.sendMessage(
-      chatId,
+      ctx.recipient,
       CONSENT_DISCLAIMER,
       getConsentKeyboard(),
     );
@@ -24,7 +24,7 @@ export async function startHandler(ctx) {
   }
 
   await MaxService.sendMessage(
-    chatId,
+    ctx.recipient,
     `Здравствуйте, ${user.displayName ?? "студент"}!\n\nВыберите действие:`,
     getStudentMenuKeyboard(),
   );

@@ -8,6 +8,5 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// На Vercel (serverless) один клиент на инстанс — меньше исчерпания соединений с БД
+globalForPrisma.prisma = prisma;

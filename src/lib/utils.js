@@ -9,7 +9,7 @@ export function extractDisplayName(from) {
     return parts.join(" ");
   }
 
-  return from.username ?? null;
+  return from.username ?? from.name ?? null;
 }
 
 export function getChatIdFromMessage(message) {

@@ -4,13 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "prisma generate && next build --webpack",
+    "build": "prisma generate && prisma migrate deploy && next build --webpack",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "max:me": "node scripts/max-me.mjs",
+    "max:webhook": "node scripts/max-webhook.mjs",
+    "max:webhook:get": "node scripts/max-webhook.mjs get",
+    "max:webhook:delete": "node scripts/max-webhook.mjs delete",
+    "max:poll": "node scripts/max-poll.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

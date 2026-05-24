@@ -33,7 +33,7 @@ export async function messageHandler(ctx) {
 
   if (state !== FSM_STATES.WAITING_DESCRIPTION) {
     await MaxService.sendMessage(
-      chatId,
+      ctx.recipient,
       "Используйте меню или команду /start.",
     );
     return;
@@ -43,7 +43,7 @@ export async function messageHandler(ctx) {
 
   if (!description) {
     await MaxService.sendMessage(
-      chatId,
+      ctx.recipient,
       "Пожалуйста, отправьте текстовое описание вопроса.",
     );
     return;
@@ -61,7 +61,7 @@ export async function messageHandler(ctx) {
   );
 
   await MaxService.sendMessage(
-    chatId,
+    ctx.recipient,
     buildTicketSummary(nextPayload),
     getConfirmationKeyboard(),
   );
