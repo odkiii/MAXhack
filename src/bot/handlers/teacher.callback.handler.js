@@ -17,6 +17,8 @@ import { showTeacherOwnMetrics } from "@/bot/helpers/metrics.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { formatTicketCard } from "@/bot/helpers/ticket-format";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
+import { toMaxOutgoingAttachment } from "@/lib/max-media";
+import { MaxService } from "@/services/max.service";
 import { prisma } from "@/lib/prisma";
 
 export async function handleTeacherCallback(ctx, data) {
@@ -95,6 +97,40 @@ export async function handleTeacherCallback(ctx, data) {
       `Закрытые тикеты (последние ${tickets.length}):`,
       getTicketListKeyboard(tickets, "t_view"),
     );
+    return true;
+  }
+
+  if (data.startsWith("t_att_")) {
+    const ticketId = data.replace("t_att_", "");
+    const ticket = await TicketService.findByIdForTeacher(ticketId, user.id);
+
+    if (!ticket?.clarificationAttachment) {
+      await respondFromCallback(ctx, "Вложение не найдено.");
+      return true;
+    }
+
+    const outgoing = toMaxOutgoingAttachment(ticket.clarificationAttachment);
+
+    if (!outgoing) {
+      await respondFromCallback(ctx, "Не удалось открыть вложение.");
+      return true;
+    }
+
+    const caption = ticket.clarificationAnswer
+      ? `Вложение по обращению #${ticket.ticketNumber}\n\n${ticket.clarificationAnswer}`
+      : `Вложение по обращению #${ticket.ticketNumber}`;
+
+    await MaxService.sendMessage(
+      ctx.recipient,
+      caption,
+      {
+        inline_keyboard: [
+          [{ text: "К карточке", callback_data: `t_view_${ticket.id}` }],
+        ],
+      },
+      [outgoing],
+    );
+
     return true;
   }
 

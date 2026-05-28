@@ -1,5 +1,9 @@
 import { formatTicketListLabel } from "@/bot/helpers/ticket-format";
 import {
+  getAttachmentViewButtonLabel,
+  hasStoredAttachment,
+} from "@/lib/max-media";
+import {
   CLARIFICATION_LABELS,
   CLARIFICATION_SELECTABLE_TYPES,
 } from "@/bot/constants/clarifications";
@@ -42,6 +46,15 @@ export function getTeacherTicketActionsKeyboard(ticket) {
   if (status === "SCHEDULED") {
     rows.push([
       { text: "Закрыть (консультация)", callback_data: `t_finalize_${ticketId}` },
+    ]);
+  }
+
+  if (typeof ticket !== "string" && hasStoredAttachment(ticket.clarificationAttachment)) {
+    rows.push([
+      {
+        text: getAttachmentViewButtonLabel(ticket.clarificationAttachment),
+        callback_data: `t_att_${ticketId}`,
+      },
     ]);
   }
 

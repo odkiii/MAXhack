@@ -81,16 +81,40 @@ export function formatStoredAttachmentLabel(stored) {
   }
 
   if (stored.type === "image") {
-    return "📎 Прикреплён скриншот";
+    return "📎 Есть скриншот — кнопка «Смотреть скриншот»";
   }
 
   if (stored.type === "file") {
-    return "📎 Прикреплён файл";
+    return "📎 Есть файл — кнопка «Смотреть файл»";
   }
 
   if (stored.type === "video") {
-    return "📎 Прикреплено видео";
+    return "📎 Есть видео — кнопка «Смотреть видео»";
   }
 
-  return "📎 Прикрепление";
+  return "📎 Есть вложение";
+}
+
+export function getAttachmentViewButtonLabel(stored) {
+  if (!stored?.type) {
+    return "📎 Смотреть вложение";
+  }
+
+  if (stored.type === "image") {
+    return "🖼 Смотреть скриншот";
+  }
+
+  if (stored.type === "file") {
+    return "📎 Смотреть файл";
+  }
+
+  if (stored.type === "video") {
+    return "🎬 Смотреть видео";
+  }
+
+  return "📎 Смотреть вложение";
+}
+
+export function hasStoredAttachment(stored) {
+  return Boolean(toMaxOutgoingAttachment(stored));
 }
