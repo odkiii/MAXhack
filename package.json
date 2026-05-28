@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "db:seed": "node scripts/seed-history.mjs",
     "max:me": "node scripts/max-me.mjs",
     "max:webhook": "node scripts/max-webhook.mjs",
     "max:webhook:get": "node scripts/max-webhook.mjs get",
