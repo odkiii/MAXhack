@@ -2,6 +2,7 @@ import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
+import { TICKET_STATUSES, formatStatus } from "@/bot/constants/statuses";
 import {
   getSimilarDecisionKeyboard,
   getCategoryKeyboard,
@@ -262,7 +263,7 @@ export async function messageHandler(ctx) {
 
     await sendBotMessage(
       ctx,
-      "Слоты предложены. Статус: Назначено. После выбора студентом можно закрыть тикет.",
+      `Слоты предложены. Статус: ${formatStatus(TICKET_STATUSES.SCHEDULED)}. После выбора студентом можно закрыть тикет.`,
     );
 
     await NotificationService.notifyUserId(

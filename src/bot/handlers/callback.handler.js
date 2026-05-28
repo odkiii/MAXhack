@@ -6,7 +6,7 @@ import { UserService } from "@/services/user.service";
 import { NotificationService } from "@/services/notification.service";
 import { StateService } from "@/services/state.service";
 import { NavigationService } from "@/services/navigation.service";
-import { isAdmin } from "@/bot/helpers/admin.helper";
+import { isAdmin, ADMIN_ACTION_BUTTONS } from "@/bot/helpers/admin.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { handleNavigationBack } from "@/bot/helpers/navigation.helper";
 import { showMainMenu } from "@/bot/helpers/menu.helper";
@@ -22,11 +22,11 @@ function buildPendingTeachersKeyboard(pending) {
     inline_keyboard: [
       ...pending.map((user) => [
         {
-          text: `Подтвердить: ${user.displayName ?? user.maxUserId}`,
+          text: `${ADMIN_ACTION_BUTTONS.VERIFY}: ${user.displayName ?? user.maxUserId}`,
           callback_data: `admin_verify_${user.id}`,
         },
         {
-          text: "Отклонить",
+          text: ADMIN_ACTION_BUTTONS.REJECT,
           callback_data: `admin_reject_${user.id}`,
         },
       ]),

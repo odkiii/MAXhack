@@ -1,6 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { MaxService } from "@/services/max.service";
 
+const NOTIFICATION_PREFIX = "🔔 ";
+
+function formatNotificationText(text) {
+  const trimmed = (text ?? "").trim();
+
+  if (!trimmed) {
+    return NOTIFICATION_PREFIX.trim();
+  }
+
+  if (trimmed.startsWith(NOTIFICATION_PREFIX.trim())) {
+    return trimmed;
+  }
+
+  return `${NOTIFICATION_PREFIX}${trimmed}`;
+}
+
 export class NotificationService {
   static async notifyMaxUser(maxUserId, text, keyboard = null) {
     if (!maxUserId) {
@@ -13,7 +29,7 @@ export class NotificationService {
         chatType: "dialog",
         chatId: null,
       },
-      text,
+      formatNotificationText(text),
       keyboard,
     );
   }

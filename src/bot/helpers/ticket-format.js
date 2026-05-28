@@ -1,5 +1,5 @@
 import {
-  STATUS_LABELS,
+  formatStatus,
   CLOSE_OUTCOME_LABELS,
 } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
@@ -27,7 +27,7 @@ export function formatTicketListLabel(ticket) {
 }
 
 export function formatTicketCard(ticket, { full = false } = {}) {
-  const status = STATUS_LABELS[ticket.status] ?? ticket.status;
+  const status = formatStatus(ticket.status);
   const created = ticket.createdAt
     ? new Date(ticket.createdAt).toLocaleString("ru-RU")
     : "—";

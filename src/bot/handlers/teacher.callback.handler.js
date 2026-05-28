@@ -2,7 +2,7 @@ import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
-import { TICKET_STATUSES, CLOSE_OUTCOMES, CLOSE_OUTCOME_LABELS, STATUS_LABELS } from "@/bot/constants/statuses";
+import { TICKET_STATUSES, CLOSE_OUTCOMES, CLOSE_OUTCOME_LABELS, formatStatus } from "@/bot/constants/statuses";
 import { CLARIFICATION_SELECTABLE_TYPES } from "@/bot/constants/clarifications";
 import {
   getTeacherTicketActionsKeyboard,
@@ -40,7 +40,7 @@ export async function handleTeacherCallback(ctx, data) {
     });
 
     const lines = counts
-      .map((c) => `${STATUS_LABELS[c.status] ?? c.status}: ${c._count}`)
+      .map((c) => `${formatStatus(c.status)}: ${c._count}`)
       .join("\n");
 
     await respondFromCallback(

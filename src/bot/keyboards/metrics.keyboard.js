@@ -1,3 +1,5 @@
+import { ADMIN_MENU_BUTTONS } from "@/bot/helpers/admin.helper";
+
 export const METRICS_PER_PAGE = 5;
 
 export function getTeacherMetricsListKeyboard(teachers, page, totalPages, prefix = "admin_mview") {
@@ -53,5 +55,5 @@ export function buildTeacherMetricsListText(page, totalPages, totalTeachers) {
     return "Выберите преподавателя для просмотра метрик:";
   }
 
-  return `Метрики преподавателей (стр. ${page + 1} из ${totalPages}):`;
+  return `${ADMIN_MENU_BUTTONS.TEACHER_METRICS} (стр. ${page + 1} из ${totalPages}):`;
 }

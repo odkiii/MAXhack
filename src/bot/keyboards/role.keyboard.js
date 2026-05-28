@@ -1,4 +1,5 @@
 import { MENU_TEXT } from "@/bot/constants/menu-text";
+import { ADMIN_ACTION_BUTTONS } from "@/bot/helpers/admin.helper";
 
 export function getRoleSelectionKeyboard() {
   return {
@@ -36,8 +37,8 @@ export function getTeacherVerificationRequestKeyboard() {
 export function getAdminTeacherVerificationKeyboard(userId) {
   return {
     inline_keyboard: [
-      [{ text: "Подтвердить преподавателя", callback_data: `admin_verify_${userId}` }],
-      [{ text: "Отклонить", callback_data: `admin_reject_${userId}` }],
+      [{ text: ADMIN_ACTION_BUTTONS.VERIFY_TEACHER, callback_data: `admin_verify_${userId}` }],
+      [{ text: ADMIN_ACTION_BUTTONS.REJECT, callback_data: `admin_reject_${userId}` }],
     ],
   };
 }

@@ -10,11 +10,31 @@ export const TICKET_STATUSES = {
 export const STATUS_LABELS = {
   [TICKET_STATUSES.NEW]: "Новый",
   [TICKET_STATUSES.IN_PROGRESS]: "В работе",
-  [TICKET_STATUSES.AWAITING_CLARIFICATION]: "Ожидает уточнения",
+  [TICKET_STATUSES.AWAITING_CLARIFICATION]: "Требует уточнения",
   [TICKET_STATUSES.SCHEDULED]: "Назначено",
   [TICKET_STATUSES.CLOSED]: "Закрыт",
   [TICKET_STATUSES.CANCELLED]: "Отменён",
 };
+
+export const STATUS_EMOJIS = {
+  [TICKET_STATUSES.NEW]: "🟢",
+  [TICKET_STATUSES.IN_PROGRESS]: "🟡",
+  [TICKET_STATUSES.AWAITING_CLARIFICATION]: "🔵",
+  [TICKET_STATUSES.SCHEDULED]: "✅",
+  [TICKET_STATUSES.CLOSED]: "✅",
+  [TICKET_STATUSES.CANCELLED]: "❌",
+};
+
+export function formatStatus(status) {
+  const label = STATUS_LABELS[status] ?? status;
+  const emoji = STATUS_EMOJIS[status];
+
+  if (!emoji) {
+    return String(label);
+  }
+
+  return `${emoji} ${label}`;
+}
 
 export const CLOSE_OUTCOMES = {
   RESOLVED: "RESOLVED",

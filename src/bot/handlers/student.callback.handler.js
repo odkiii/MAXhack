@@ -35,7 +35,7 @@ import {
   formatTicketCard,
   formatTicketListLabel,
 } from "@/bot/helpers/ticket-format";
-import { STATUS_LABELS } from "@/bot/constants/statuses";
+import { formatStatus } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
 import { getConsentKeyboard } from "@/bot/keyboards/consent.keyboard";
 import {
@@ -314,7 +314,7 @@ export async function handleStudentCallback(ctx, data) {
         inline_keyboard: [
           ...tickets.slice(0, 8).map((t) => [
             {
-              text: `#${t.ticketNumber} · ${STATUS_LABELS[t.status]}`,
+              text: `#${t.ticketNumber} · ${formatStatus(t.status)}`,
               callback_data: `st_view_${t.id}`,
             },
           ]),
@@ -399,7 +399,7 @@ export async function handleStudentCallback(ctx, data) {
           `Обращение уже создано.
 
 #${existing.ticketNumber}
-Статус: ${STATUS_LABELS[existing.status]}`,
+Статус: ${formatStatus(existing.status)}`,
           getAfterCreateKeyboard(existing.id),
         );
         return true;
@@ -439,7 +439,7 @@ export async function handleStudentCallback(ctx, data) {
 
 Категория: ${getCategoryLabel(ticket.category)}
 Преподаватель: ${teacherName}
-Статус: ${STATUS_LABELS[ticket.status]}`,
+Статус: ${formatStatus(ticket.status)}`,
       getAfterCreateKeyboard(ticket.id),
     );
 
@@ -582,7 +582,7 @@ ${ticket.description}`,
     await respondFromCallback(
       ctx,
       `Выбран слот: ${slot}
-Обращение #${ticket.ticketNumber}, статус: ${STATUS_LABELS[ticket.status]}`,
+Обращение #${ticket.ticketNumber}, статус: ${formatStatus(ticket.status)}`,
     );
 
     await NotificationService.notifyUserId(

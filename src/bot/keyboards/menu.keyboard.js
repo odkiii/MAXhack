@@ -1,4 +1,4 @@
-import { isAdmin } from "@/bot/helpers/admin.helper";
+import { isAdmin, ADMIN_MENU_BUTTONS } from "@/bot/helpers/admin.helper";
 import { MENU_TEXT } from "@/bot/constants/menu-text";
 
 function messageButton(text) {
@@ -21,13 +21,13 @@ export function getStudentMenuKeyboard(user) {
   if (isAdmin(user)) {
     rows.push([
       callbackButton(
-        "Подтверждение преподавателей",
+        ADMIN_MENU_BUTTONS.PENDING_TEACHERS,
         "admin_pending_teachers",
       ),
     ]);
     rows.push([
       callbackButton(
-        "Метрики преподавателей",
+        ADMIN_MENU_BUTTONS.TEACHER_METRICS,
         "admin_teacher_metrics",
       ),
     ]);
