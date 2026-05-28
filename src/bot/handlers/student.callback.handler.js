@@ -36,10 +36,14 @@ import { STATUS_LABELS } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
 import { getConsentKeyboard } from "@/bot/keyboards/consent.keyboard";
 import {
-  getRoleSelectionKeyboard,
   getTeacherVerificationRequestKeyboard,
   getAdminTeacherVerificationKeyboard,
+  getPendingTeacherVerificationKeyboard,
 } from "@/bot/keyboards/role.keyboard";
+import {
+  routeUserAfterAuth,
+  showPendingTeacherVerification,
+} from "@/bot/helpers/onboarding.helper";
 
 function buildTicketSummary(payload) {
   const teacherName =
@@ -94,11 +98,7 @@ export async function handleStudentCallback(ctx, data) {
   if (data === "accept_consent") {
     await ConsentService.accept(user.id);
     await StateService.clear(user.id);
-    await respondFromCallback(
-      ctx,
-      "Выберите роль для работы с ботом:",
-      getRoleSelectionKeyboard(),
-    );
+    await routeUserAfterAuth(ctx);
     return true;
   }
 
@@ -114,8 +114,8 @@ export async function handleStudentCallback(ctx, data) {
   }
 
   if (data === "role_student") {
-    await UserService.setRoleStudent(user.id);
-    await showMainMenu({ ...ctx, user: { ...user, role: ROLES.STUDENT } });
+    const updated = await UserService.setRoleStudent(user.id);
+    await showMainMenu({ ...ctx, user: updated });
     return true;
   }
 
@@ -129,11 +129,7 @@ export async function handleStudentCallback(ctx, data) {
     }
 
     if (user.teacherVerificationStatus === "PENDING") {
-      await respondFromCallback(
-        ctx,
-        "Ваш запрос на подтверждение преподавателя уже отправлен и ожидает решения администратора.",
-        getRoleSelectionKeyboard(),
-      );
+      await showPendingTeacherVerification(ctx);
       return true;
     }
 
@@ -160,7 +156,7 @@ export async function handleStudentCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       "Запрос отправлен администратору. После подтверждения вы сможете принимать тикеты студентов.",
-      getRoleSelectionKeyboard(),
+      getPendingTeacherVerificationKeyboard(),
     );
     return true;
   }

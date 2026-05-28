@@ -10,6 +10,15 @@ export function getRoleSelectionKeyboard() {
   };
 }
 
+export function getPendingTeacherVerificationKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "Я студент", callback_data: "role_student" }],
+      [{ text: MENU_TEXT.START, type: "message" }],
+    ],
+  };
+}
+
 export function getTeacherVerificationRequestKeyboard() {
   return {
     inline_keyboard: [

@@ -37,6 +37,10 @@ export class UserService {
         updates.teacherVerificationApprovedAt = new Date();
       }
 
+      if (isConfiguredTeacher(maxUserId) && !existing.roleSelectedAt) {
+        updates.roleSelectedAt = new Date();
+      }
+
       if (Object.keys(updates).length > 0) {
         return prisma.user.update({
           where: { id: existing.id },
@@ -55,6 +59,7 @@ export class UserService {
         teacherVerificationStatus: effectiveVerification,
         teacherVerificationApprovedAt:
           effectiveVerification === "APPROVED" ? new Date() : null,
+        roleSelectedAt: isConfiguredTeacher(maxUserId) ? new Date() : null,
       },
     });
   }
@@ -72,7 +77,10 @@ export class UserService {
   static async setRoleStudent(userId) {
     return prisma.user.update({
       where: { id: userId },
-      data: { role: ROLES.STUDENT },
+      data: {
+        role: ROLES.STUDENT,
+        roleSelectedAt: new Date(),
+      },
     });
   }
 
@@ -83,6 +91,7 @@ export class UserService {
         role: ROLES.TEACHER,
         teacherVerificationStatus: "PENDING",
         teacherVerificationRequestedAt: new Date(),
+        roleSelectedAt: new Date(),
       },
     });
   }
@@ -94,6 +103,7 @@ export class UserService {
         role: ROLES.TEACHER,
         teacherVerificationStatus: "APPROVED",
         teacherVerificationApprovedAt: new Date(),
+        roleSelectedAt: new Date(),
       },
     });
   }

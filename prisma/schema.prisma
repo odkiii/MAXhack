@@ -79,6 +79,7 @@ model User {
   teacherVerificationStatus      TeacherVerificationStatus @default(NONE)
   teacherVerificationRequestedAt DateTime?
   teacherVerificationApprovedAt  DateTime?
+  roleSelectedAt                 DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
