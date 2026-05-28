@@ -120,7 +120,6 @@ model Ticket {
   category     TicketCategory
   status       TicketStatus   @default(NEW)
   description  String
-  title        String?
 
   clarificationTypes    ClarificationType[] @default([])
   clarificationComment  String?

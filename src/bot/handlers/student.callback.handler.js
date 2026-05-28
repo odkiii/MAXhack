@@ -30,7 +30,7 @@ import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { showTeacherSelectionPage } from "@/bot/helpers/teacher-selection.helper";
 import {
   formatTicketCard,
-  buildTicketTitle,
+  formatTicketListLabel,
 } from "@/bot/helpers/ticket-format";
 import { STATUS_LABELS } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
@@ -54,7 +54,7 @@ function buildTicketSummary(payload) {
   return `Проверьте обращение:
 
 Преподаватель: ${teacherName}
-Описание: ${payload.description ?? "—"}
+Текст: ${payload.description ?? "—"}
 
 ${PII_WARNING}
 
@@ -88,7 +88,7 @@ async function proceedAfterTeacherSelect(ctx, payload, teacherId, teacherMeta = 
   await StateService.set(ctx.user.id, FSM_STATES.WAITING_DESCRIPTION, nextPayload);
   await respondFromCallback(
     ctx,
-    `Кратко опишите вопрос одним сообщением.\n\n${PII_WARNING}`,
+    `Опишите вопрос одним сообщением.\n\n${PII_WARNING}`,
   );
 }
 
@@ -419,7 +419,7 @@ export async function handleStudentCallback(ctx, data) {
     await NotificationService.notifyUserId(
       ticket.teacherId,
       `Новое обращение #${ticket.ticketNumber}
-${ticket.title ?? buildTicketTitle(ticket.description)}`,
+${ticket.description}`,
       {
         inline_keyboard: [
           [{ text: "Открыть", callback_data: `t_view_${ticket.id}` }],

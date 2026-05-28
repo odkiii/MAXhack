@@ -1,3 +1,5 @@
+import { formatTicketListLabel } from "@/bot/helpers/ticket-format";
+
 export function getTeacherTicketActionsKeyboard(ticketId, status) {
   const rows = [];
 
@@ -77,7 +79,7 @@ export function getTicketListKeyboard(tickets, prefix) {
     inline_keyboard: [
       ...tickets.slice(0, 10).map((t) => [
         {
-          text: `#${t.ticketNumber} · ${t.title ?? "Обращение"}`,
+          text: `#${t.ticketNumber} · ${formatTicketListLabel(t)}`,
           callback_data: `${prefix}_${t.id}`,
         },
       ]),

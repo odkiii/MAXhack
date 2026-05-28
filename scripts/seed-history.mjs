@@ -849,7 +849,6 @@ async function main() {
       category,
       status: "CLOSED",
       description: item.question,
-      title: item.question.slice(0, 80),
       teacherResponse: item.answer,
       closeOutcome: "RESOLVED",
       closeReason: "Решено",

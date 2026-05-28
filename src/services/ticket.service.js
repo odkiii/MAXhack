@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { TICKET_STATUSES } from "@/bot/constants/statuses";
-import { buildTicketTitle } from "@/bot/helpers/ticket-format";
 import { TicketEventService } from "@/services/ticket-event.service";
 import { getTeacherByMaxUserId, TEACHERS } from "@/bot/constants/categories";
 
@@ -8,15 +7,12 @@ export class TicketService {
   static async create(data) {
     const { studentId, teacherId, description } = data;
     const category = "OTHER";
-    const title = buildTicketTitle(description);
-
     const ticket = await prisma.ticket.create({
       data: {
         studentId,
         teacherId,
         category,
         description,
-        title,
         status: TICKET_STATUSES.NEW,
       },
       include: { student: true, teacher: true },
@@ -110,7 +106,7 @@ export class TicketService {
 
     for (const ticket of closedTickets) {
       const haystack = normalizeForSearch(
-        [ticket.title, ticket.description, ticket.teacherResponse]
+        [ticket.description, ticket.teacherResponse]
           .filter(Boolean)
           .join(" "),
       );
@@ -159,7 +155,7 @@ export class TicketService {
       }
 
       const haystack = normalizeForSearch(
-        [ticket.title, ticket.description, ticket.teacherResponse]
+        [ticket.description, ticket.teacherResponse]
           .filter(Boolean)
           .join(" "),
       );

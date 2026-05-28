@@ -1,0 +1,1 @@
+ALTER TABLE "Ticket" DROP COLUMN IF EXISTS "title";

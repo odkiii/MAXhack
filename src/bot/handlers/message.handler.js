@@ -28,7 +28,7 @@ function buildTicketSummary(payload) {
   return `Проверьте обращение:
 
 Преподаватель: ${teacherName}
-Описание: ${payload.description}
+Текст: ${payload.description}
 
 ${PII_WARNING}
 
