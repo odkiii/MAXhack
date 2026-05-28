@@ -1,8 +1,11 @@
+import { MENU_TEXT } from "@/bot/constants/menu-text";
+
 export function getRoleSelectionKeyboard() {
   return {
     inline_keyboard: [
       [{ text: "Я студент", callback_data: "role_student" }],
       [{ text: "Я преподаватель", callback_data: "role_teacher" }],
+      [{ text: MENU_TEXT.START, type: "message" }],
     ],
   };
 }

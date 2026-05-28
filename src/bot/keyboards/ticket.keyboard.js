@@ -1,15 +1,6 @@
 import { TEACHERS } from "@/bot/constants/categories";
 
-export function getTeacherSelectionKeyboard() {
-  return {
-    inline_keyboard: TEACHERS.map((teacher) => [
-      { text: teacher.displayName, callback_data: teacher.key },
-    ]),
-  };
-}
-
-export function getConfirmationKeyboard() {
-  return {
+export function getConfirmationKeyboard() {  return {
     inline_keyboard: [
       [{ text: "Подтвердить отправку", callback_data: "confirm_ticket" }],
       [{ text: "Отмена", callback_data: "cancel_ticket" }],

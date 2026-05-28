@@ -2,16 +2,27 @@
  * Converts internal keyboard shape (Telegram-like) to MAX inline_keyboard attachment.
  */
 export function toMaxInlineKeyboard(keyboard) {
-  if (!keyboard?.inline_keyboard?.length) {
+  const rows = keyboard?.inline_keyboard;
+
+  if (!rows?.length) {
     return null;
   }
 
-  const buttons = keyboard.inline_keyboard.map((row) =>
-    row.map((button) => ({
-      type: "callback",
-      text: button.text,
-      payload: button.callback_data ?? button.payload,
-    })),
+  const buttons = rows.map((row) =>
+    row.map((button) => {
+      if (button.type === "message") {
+        return {
+          type: "message",
+          text: button.text,
+        };
+      }
+
+      return {
+        type: "callback",
+        text: button.text,
+        payload: button.callback_data ?? button.payload,
+      };
+    }),
   );
 
   return {

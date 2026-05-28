@@ -4,7 +4,7 @@ import { handleStudentCallback } from "@/bot/handlers/student.callback.handler";
 import { handleTeacherCallback } from "@/bot/handlers/teacher.callback.handler";
 import { UserService } from "@/services/user.service";
 import { NotificationService } from "@/services/notification.service";
-import { isAdmin, appendAdminMenuRow } from "@/bot/helpers/admin.helper";
+import { isAdmin } from "@/bot/helpers/admin.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 
@@ -33,7 +33,7 @@ async function showPendingTeachers(ctx) {
     await respondFromCallback(
       ctx,
       "Нет ожидающих запросов на подтверждение преподавателей.",
-      appendAdminMenuRow(getBackToMenuKeyboard(), ctx.user),
+      getBackToMenuKeyboard(ctx.user),
     );
     return;
   }
@@ -76,7 +76,7 @@ export async function callbackHandler(ctx) {
       await respondFromCallback(
         ctx,
         `Подтверждено: ${approved.displayName ?? approved.maxUserId}.\n\nБольше нет ожидающих запросов.`,
-        appendAdminMenuRow(getBackToMenuKeyboard(), ctx.user),
+        getBackToMenuKeyboard(ctx.user),
       );
       return;
     }
@@ -111,7 +111,7 @@ export async function callbackHandler(ctx) {
       await respondFromCallback(
         ctx,
         `Отклонено: ${rejected.displayName ?? rejected.maxUserId}.\n\nБольше нет ожидающих запросов.`,
-        appendAdminMenuRow(getBackToMenuKeyboard(), ctx.user),
+        getBackToMenuKeyboard(ctx.user),
       );
       return;
     }

@@ -1,16 +1,47 @@
-export function getStudentMenuKeyboard() {
+import { isAdmin } from "@/bot/helpers/admin.helper";
+import { MENU_TEXT } from "@/bot/constants/menu-text";
+
+function messageButton(text) {
+  return { text, type: "message" };
+}
+
+function callbackButton(text, callback_data) {
+  return { text, callback_data };
+}
+
+export function getStudentMenuKeyboard(user) {
+  const rows = [
+    [messageButton(MENU_TEXT.CREATE_TICKET)],
+    [messageButton(MENU_TEXT.MY_TICKETS)],
+    [messageButton(MENU_TEXT.HELP)],
+    [messageButton(MENU_TEXT.DELETE_DATA)],
+    [messageButton(MENU_TEXT.START)],
+  ];
+
+  if (isAdmin(user)) {
+    rows.push([
+      callbackButton(
+        "Подтверждение преподавателей",
+        "admin_pending_teachers",
+      ),
+    ]);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+export function getStartMenuKeyboard() {
   return {
-    inline_keyboard: [
-      [{ text: "Создать обращение", callback_data: "create_ticket" }],
-      [{ text: "Мои обращения", callback_data: "my_tickets" }],
-      [{ text: "Помощь", callback_data: "help" }],
-      [{ text: "Удаление данных", callback_data: "delete_data" }],
-    ],
+    inline_keyboard: [[messageButton(MENU_TEXT.START)]],
   };
 }
 
-export function getBackToMenuKeyboard() {
+export function getBackToMenuKeyboard(user = null) {
+  if (user) {
+    return getStudentMenuKeyboard(user);
+  }
+
   return {
-    inline_keyboard: [[{ text: "В главное меню", callback_data: "main_menu" }]],
+    inline_keyboard: [[messageButton(MENU_TEXT.START)]],
   };
 }

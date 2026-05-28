@@ -10,7 +10,9 @@ import {
 import { getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
-import { showMainMenu, resolveMenuRole } from "@/bot/helpers/menu.helper";
+import { showMainMenu, resolveMenuRole, sendMainMenuMessage } from "@/bot/helpers/menu.helper";
+import { resolveMenuTextAction } from "@/bot/constants/menu-text";
+import { dispatchMenuTextAction } from "@/bot/helpers/menu-actions.helper";
 import { ROLES } from "@/bot/constants/roles";
 import { finalizeClose } from "@/bot/handlers/teacher.callback.handler";
 import { CLOSE_OUTCOMES } from "@/bot/constants/statuses";
@@ -18,11 +20,14 @@ import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
 import { PII_WARNING } from "@/bot/texts/legal";
 
 function buildTicketSummary(payload) {
-  const teacher = getTeacherByKey(payload.teacherKey);
+  const teacherName =
+    payload.teacherDisplayName ??
+    getTeacherByKey(payload.teacherKey)?.displayName ??
+    "—";
 
   return `Проверьте обращение:
 
-Преподаватель: ${teacher?.displayName ?? "—"}
+Преподаватель: ${teacherName}
 Описание: ${payload.description}
 
 ${PII_WARNING}
@@ -38,8 +43,15 @@ export async function messageHandler(ctx) {
     return;
   }
 
-  const { state, payload } = await StateService.get(user.id);
   const role = resolveMenuRole(user);
+  const menuAction = resolveMenuTextAction(text, role);
+
+  if (menuAction) {
+    await dispatchMenuTextAction(ctx, menuAction);
+    return;
+  }
+
+  const { state, payload } = await StateService.get(user.id);
 
   if (state === FSM_STATES.WAITING_QUESTION_INPUT && role === ROLES.STUDENT) {
     const draftQuestion = text?.trim();
@@ -294,11 +306,7 @@ export async function messageHandler(ctx) {
     return;
   }
 
-  await MaxService.sendMessage(
-    ctx.recipient,
-    "Используйте меню или команду /start.",
-  );
-  await showMainMenu(ctx);
+  await sendMainMenuMessage(ctx.recipient, ctx.user);
 }
 
 function getDaysAgoLabel(dateValue) {

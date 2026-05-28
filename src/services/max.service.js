@@ -88,27 +88,12 @@ export class MaxService {
     }
 
     try {
+      const attachments = toMaxAttachments(keyboard);
+
       return await answerCallback(callbackId, {
         message: {
           text,
-          ...(keyboard?.inline_keyboard
-            ? {
-                attachments: [
-                  {
-                    type: "inline_keyboard",
-                    payload: {
-                      buttons: keyboard.inline_keyboard.map((row) =>
-                        row.map((btn) => ({
-                          type: "callback",
-                          text: btn.text,
-                          payload: btn.callback_data ?? btn.payload,
-                        })),
-                      ),
-                    },
-                  },
-                ],
-              }
-            : {}),
+          ...(attachments ? { attachments } : {}),
         },
       });
     } catch (error) {

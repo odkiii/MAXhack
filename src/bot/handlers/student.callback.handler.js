@@ -10,7 +10,6 @@ import {
   getTeacherByKey,
 } from "@/bot/constants/categories";
 import {
-  getTeacherSelectionKeyboard,
   getConfirmationKeyboard,
   getAfterCreateKeyboard,
   getStudentTicketActionsKeyboard,
@@ -28,7 +27,7 @@ import {
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
-import { appendAdminMenuRow } from "@/bot/helpers/admin.helper";
+import { showTeacherSelectionPage } from "@/bot/helpers/teacher-selection.helper";
 import {
   formatTicketCard,
   buildTicketTitle,
@@ -43,11 +42,14 @@ import {
 } from "@/bot/keyboards/role.keyboard";
 
 function buildTicketSummary(payload) {
-  const teacher = getTeacherByKey(payload.teacherKey);
+  const teacherName =
+    payload.teacherDisplayName ??
+    getTeacherByKey(payload.teacherKey)?.displayName ??
+    "—";
 
   return `Проверьте обращение:
 
-Преподаватель: ${teacher?.displayName ?? "—"}
+Преподаватель: ${teacherName}
 Описание: ${payload.description ?? "—"}
 
 ${PII_WARNING}
@@ -55,11 +57,17 @@ ${PII_WARNING}
 Подтвердите отправку или отмените.`;
 }
 
-async function proceedAfterTeacherSelect(ctx, payload, teacherKey, teacherId) {
+async function proceedAfterTeacherSelect(ctx, payload, teacherId, teacherMeta = {}) {
+  const teacherUser = teacherMeta.displayName
+    ? null
+    : await UserService.findById(teacherId);
+
   const nextPayload = {
     ...payload,
-    teacherKey,
     teacherId,
+    teacherKey: teacherMeta.key ?? payload.teacherKey,
+    teacherDisplayName:
+      teacherMeta.displayName ?? teacherUser?.displayName ?? "Преподаватель",
     description: payload.draftQuestion ?? payload.description,
   };
 
@@ -176,7 +184,7 @@ export async function handleStudentCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       "Отлично, рад что помогло. Новый тикет не создавался.",
-      appendAdminMenuRow(getBackToMenuKeyboard(), user),
+      getBackToMenuKeyboard(user),
     );
     return true;
   }
@@ -194,11 +202,7 @@ export async function handleStudentCallback(ctx, data) {
 
     if (recommended.length === 0) {
       await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, { draftQuestion });
-      await respondFromCallback(
-        ctx,
-        "Похожих решенных вопросов не найдено. Выберите преподавателя:",
-        getTeacherSelectionKeyboard(),
-      );
+      await showTeacherSelectionPage(ctx, 0);
       return true;
     }
 
@@ -225,11 +229,41 @@ export async function handleStudentCallback(ctx, data) {
   if (data === "manual_teacher_select") {
     const { payload } = await StateService.get(user.id);
     await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, payload ?? {});
-    await respondFromCallback(
-      ctx,
-      "Выберите преподавателя из справочника:",
-      getTeacherSelectionKeyboard(),
-    );
+    await showTeacherSelectionPage(ctx, 0);
+    return true;
+  }
+
+  if (data.startsWith("tpage_")) {
+    const pagePart = data.replace("tpage_", "");
+
+    if (pagePart === "noop") {
+      return true;
+    }
+
+    const page = Number(pagePart);
+
+    if (!Number.isFinite(page)) {
+      return false;
+    }
+
+    await showTeacherSelectionPage(ctx, page);
+    return true;
+  }
+
+  if (data.startsWith("pick_teacher_")) {
+    const teacherId = data.replace("pick_teacher_", "");
+    const teacher = await UserService.findById(teacherId);
+
+    if (!teacher || teacher.role !== ROLES.TEACHER) {
+      await respondFromCallback(ctx, "Преподаватель не найден.");
+      return true;
+    }
+
+    const { payload } = await StateService.get(user.id);
+
+    await proceedAfterTeacherSelect(ctx, payload ?? {}, teacher.id, {
+      displayName: teacher.displayName,
+    });
     return true;
   }
 
@@ -251,8 +285,11 @@ export async function handleStudentCallback(ctx, data) {
     await proceedAfterTeacherSelect(
       ctx,
       payload ?? {},
-      teacherData.key,
       teacher.id,
+      {
+        key: teacherData.key,
+        displayName: teacherData.displayName,
+      },
     );
     return true;
   }
@@ -264,7 +301,7 @@ export async function handleStudentCallback(ctx, data) {
       await respondFromCallback(
         ctx,
         "У вас пока нет обращений.",
-        appendAdminMenuRow(getBackToMenuKeyboard(), user),
+        getBackToMenuKeyboard(user),
       );
       return true;
     }
@@ -277,20 +314,17 @@ export async function handleStudentCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       `Ваши обращения:\n\n${lines}`,
-      appendAdminMenuRow(
-        {
-          inline_keyboard: [
-            ...tickets.slice(0, 8).map((t) => [
-              {
-                text: `#${t.ticketNumber} · ${STATUS_LABELS[t.status]}`,
-                callback_data: `st_view_${t.id}`,
-              },
-            ]),
-            [{ text: "В главное меню", callback_data: "main_menu" }],
-          ],
-        },
-        user,
-      ),
+      {
+        inline_keyboard: [
+          ...tickets.slice(0, 8).map((t) => [
+            {
+              text: `#${t.ticketNumber} · ${STATUS_LABELS[t.status]}`,
+              callback_data: `st_view_${t.id}`,
+            },
+          ]),
+          ...getBackToMenuKeyboard(user).inline_keyboard,
+        ],
+      },
     );
     return true;
   }
@@ -317,28 +351,6 @@ export async function handleStudentCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       "Ваши данные в сервисе удалены. Чтобы снова пользоваться ботом, отправьте /start.",
-    );
-    return true;
-  }
-
-  if (data.startsWith("teacher_")) {
-    const teacherMeta = getTeacherByKey(data);
-
-    if (!teacherMeta) {
-      await respondFromCallback(ctx, "Преподаватель не найден.");
-      return true;
-    }
-
-    const teacher = await UserService.findOrCreate(
-      { id: teacherMeta.maxUserId, first_name: teacherMeta.displayName },
-      ROLES.TEACHER,
-    );
-
-    await proceedAfterTeacherSelect(
-      ctx,
-      (await StateService.get(user.id)).payload ?? {},
-      data,
-      teacher.id,
     );
     return true;
   }
@@ -394,13 +406,16 @@ export async function handleStudentCallback(ctx, data) {
     });
     await StateService.clear(user.id);
 
-    const teacher = getTeacherByKey(payload.teacherKey);
+    const teacherName =
+      payload.teacherDisplayName ??
+      getTeacherByKey(payload.teacherKey)?.displayName ??
+      "—";
 
     await respondFromCallback(
       ctx,
       `Обращение #${ticket.ticketNumber} создано.
 
-Преподаватель: ${teacher?.displayName ?? "—"}
+Преподаватель: ${teacherName}
 Статус: ${STATUS_LABELS[ticket.status]}`,
       getAfterCreateKeyboard(ticket.id),
     );

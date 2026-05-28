@@ -4,7 +4,6 @@ import { isConfiguredTeacher } from "@/bot/constants/categories";
 import { getStudentMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { getTeacherMenuKeyboard } from "@/bot/keyboards/teacher.menu.keyboard";
 import { HELP_TEXT } from "@/bot/texts/help";
-import { appendAdminMenuRow } from "@/bot/helpers/admin.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 
 export function resolveMenuRole(user) {
@@ -30,6 +29,16 @@ export function resolveMenuRole(user) {
   return ROLES.STUDENT;
 }
 
+export function getMenuKeyboardForUser(ctx) {
+  const role = resolveMenuRole(ctx.user);
+
+  if (role === ROLES.TEACHER) {
+    return getTeacherMenuKeyboard(ctx.user);
+  }
+
+  return getStudentMenuKeyboard(ctx.user);
+}
+
 export async function showMainMenu(ctx) {
   const role = resolveMenuRole(ctx.user);
   const name = ctx.user.displayName ?? "пользователь";
@@ -38,7 +47,7 @@ export async function showMainMenu(ctx) {
     await respondFromCallback(
       ctx,
       `Меню преподавателя. Здравствуйте, ${name}!`,
-      appendAdminMenuRow(getTeacherMenuKeyboard(), ctx.user),
+      getTeacherMenuKeyboard(ctx.user),
     );
     return;
   }
@@ -46,10 +55,25 @@ export async function showMainMenu(ctx) {
   await respondFromCallback(
     ctx,
     `Главное меню. Здравствуйте, ${name}!`,
-    appendAdminMenuRow(getStudentMenuKeyboard(), ctx.user),
+    getStudentMenuKeyboard(ctx.user),
   );
 }
 
 export async function showHelp(ctx) {
-  await respondFromCallback(ctx, HELP_TEXT);
+  await respondFromCallback(ctx, HELP_TEXT, getMenuKeyboardForUser(ctx));
+}
+
+export async function sendMainMenuMessage(recipient, user) {
+  const role = resolveMenuRole(user);
+  const name = user.displayName ?? "пользователь";
+  const keyboard =
+    role === ROLES.TEACHER
+      ? getTeacherMenuKeyboard(user)
+      : getStudentMenuKeyboard(user);
+  const text =
+    role === ROLES.TEACHER
+      ? `Меню преподавателя. Здравствуйте, ${name}!`
+      : `Главное меню. Здравствуйте, ${name}!`;
+
+  await MaxService.sendMessage(recipient, text, keyboard);
 }

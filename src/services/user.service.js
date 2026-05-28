@@ -108,6 +108,13 @@ export class UserService {
     });
   }
 
+  static async listTeachersForSelection() {
+    return prisma.user.findMany({
+      where: { role: ROLES.TEACHER },
+      orderBy: [{ displayName: "asc" }, { maxUserId: "asc" }],
+    });
+  }
+
   static async listPendingTeacherVerifications() {
     return prisma.user.findMany({
       where: { teacherVerificationStatus: "PENDING" },
