@@ -36,3 +36,34 @@ export function toMaxAttachments(keyboard) {
 
   return attachment ? [attachment] : null;
 }
+
+export function fromMaxAttachments(attachments) {
+  if (!Array.isArray(attachments)) {
+    return null;
+  }
+
+  const inline = attachments.find((item) => item.type === "inline_keyboard");
+  const buttons = inline?.payload?.buttons;
+
+  if (!buttons?.length) {
+    return null;
+  }
+
+  return {
+    inline_keyboard: buttons.map((row) =>
+      row.map((button) => {
+        if (button.type === "message") {
+          return {
+            text: button.text,
+            type: "message",
+          };
+        }
+
+        return {
+          text: button.text,
+          callback_data: button.payload ?? button.callback_data ?? "",
+        };
+      }),
+    ),
+  };
+}

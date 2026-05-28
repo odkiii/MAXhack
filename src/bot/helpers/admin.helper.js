@@ -1,4 +1,5 @@
 import { ROLES } from "@/bot/constants/roles";
+import { isConfiguredTeacher } from "@/bot/constants/categories";
 
 export function isAdmin(user) {
   return (
@@ -7,8 +8,27 @@ export function isAdmin(user) {
   );
 }
 
+export function isVerifiedTeacher(user) {
+  if (!user) {
+    return false;
+  }
+
+  if (isConfiguredTeacher(user.maxUserId)) {
+    return true;
+  }
+
+  return (
+    user.role === ROLES.TEACHER &&
+    user.teacherVerificationStatus === "APPROVED"
+  );
+}
+
+export function shouldShowTeacherVerificationButton(user) {
+  return isAdmin(user) && !isVerifiedTeacher(user);
+}
+
 export function appendAdminMenuRow(keyboard, user) {
-  if (!isAdmin(user)) {
+  if (!shouldShowTeacherVerificationButton(user)) {
     return keyboard;
   }
 

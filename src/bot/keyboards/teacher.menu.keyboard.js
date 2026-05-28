@@ -1,5 +1,5 @@
 import { MENU_TEXT } from "@/bot/constants/menu-text";
-import { isAdmin } from "@/bot/helpers/admin.helper";
+import { shouldShowTeacherVerificationButton } from "@/bot/helpers/admin.helper";
 
 function messageButton(text) {
   return { text, type: "message" };
@@ -19,7 +19,7 @@ export function getTeacherMenuKeyboard(user) {
     [messageButton(MENU_TEXT.START)],
   ];
 
-  if (isAdmin(user)) {
+  if (shouldShowTeacherVerificationButton(user)) {
     rows.push([
       callbackButton(
         "Подтверждение преподавателей",

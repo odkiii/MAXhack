@@ -3,7 +3,7 @@ import { TicketService } from "@/services/ticket.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
 import { TICKET_STATUSES, CLOSE_OUTCOMES, CLOSE_OUTCOME_LABELS, STATUS_LABELS } from "@/bot/constants/statuses";
-import { CLARIFICATION_TYPES } from "@/bot/constants/clarifications";
+import { CLARIFICATION_SELECTABLE_TYPES } from "@/bot/constants/clarifications";
 import {
   getTeacherTicketActionsKeyboard,
   getClarificationTypesKeyboard,
@@ -22,12 +22,6 @@ export async function handleTeacherCallback(ctx, data) {
 
   if (data === "help") {
     await showHelp(ctx);
-    return true;
-  }
-
-  if (data === "main_menu") {
-    await StateService.clear(user.id);
-    await showMainMenu(ctx);
     return true;
   }
 
@@ -157,7 +151,7 @@ export async function handleTeacherCallback(ctx, data) {
 
     await respondFromCallback(
       ctx,
-      "Выберите типы уточнения (можно несколько), затем «Готово»:",
+      "Выберите типы уточнения (можно несколько) или нажмите «Другое (написать)»:",
       getClarificationTypesKeyboard(ticketId, []),
     );
     return true;
@@ -174,7 +168,15 @@ export async function handleTeacherCallback(ctx, data) {
       }
 
       if (!payload.selectedTypes?.length) {
-        await respondFromCallback(ctx, "Выберите хотя бы один тип уточнения.");
+        await StateService.set(user.id, FSM_STATES.WAITING_CLARIFY_COMMENT, {
+          ticketId,
+          selectedTypes: [],
+        });
+
+        await respondFromCallback(
+          ctx,
+          "Напишите, что нужно уточнить у студента:",
+        );
         return true;
       }
 
@@ -185,7 +187,7 @@ export async function handleTeacherCallback(ctx, data) {
 
       await respondFromCallback(
         ctx,
-        "При необходимости добавьте однострочный комментарий или отправьте «-» без комментария:",
+        "При необходимости добавьте комментарий или отправьте «-» без комментария:",
       );
       return true;
     }
@@ -240,7 +242,12 @@ export async function handleTeacherCallback(ctx, data) {
 
     await respondFromCallback(
       ctx,
-      "Введите текстовый ответ студенту:",
+      `Обращение #${ticket.ticketNumber}
+
+Текст:
+${ticket.description ?? "—"}
+
+Введите текстовый ответ студенту:`,
     );
     return true;
   }
@@ -336,7 +343,7 @@ function parseClarifyToggleData(data) {
 
   const rest = data.slice("t_clt_".length);
 
-  for (const typeKey of Object.values(CLARIFICATION_TYPES)) {
+  for (const typeKey of CLARIFICATION_SELECTABLE_TYPES) {
     const suffix = `_${typeKey}`;
 
     if (rest.endsWith(suffix)) {

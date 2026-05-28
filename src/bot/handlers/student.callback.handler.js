@@ -103,13 +103,9 @@ export async function handleStudentCallback(ctx, data) {
   }
 
   if (data === "show_legal") {
-    await respondFromCallback(ctx, SERVICE_INTRO, getConsentKeyboard());
-    return true;
-  }
-
-  if (data === "main_menu") {
-    await StateService.clear(user.id);
-    await showMainMenu(ctx);
+    await respondFromCallback(ctx, SERVICE_INTRO, getConsentKeyboard(), {
+      navigation: false,
+    });
     return true;
   }
 
@@ -470,14 +466,19 @@ ${ticket.description}`,
       ticketId,
     });
 
-    await respondFromCallback(
-      ctx,
-      `Ответьте на уточнение одним сообщением.
+    let prompt = "Ответьте на уточнение одним сообщением.\n\n";
 
-Нужно:
-• ${types || "—"}
-${ticket.clarificationComment ? `\nКомментарий преподавателя: ${ticket.clarificationComment}` : ""}`,
-    );
+    if (types) {
+      prompt += `Нужно:\n• ${types}`;
+    }
+
+    if (ticket.clarificationComment) {
+      prompt += types
+        ? `\n\n${ticket.clarificationComment}`
+        : ticket.clarificationComment;
+    }
+
+    await respondFromCallback(ctx, prompt);
     return true;
   }
 

@@ -1,6 +1,5 @@
 import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
-import { MaxService } from "@/services/max.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
 import {
@@ -11,6 +10,7 @@ import { getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
 import { showMainMenu, resolveMenuRole, sendMainMenuMessage } from "@/bot/helpers/menu.helper";
+import { sendBotMessage } from "@/bot/helpers/navigation.helper";
 import { resolveMenuTextAction } from "@/bot/constants/menu-text";
 import { dispatchMenuTextAction } from "@/bot/helpers/menu-actions.helper";
 import { ROLES } from "@/bot/constants/roles";
@@ -57,8 +57,8 @@ export async function messageHandler(ctx) {
     const draftQuestion = text?.trim();
 
     if (!draftQuestion) {
-      await MaxService.sendMessage(
-        ctx.recipient,
+      await sendBotMessage(
+        ctx,
         "Пожалуйста, отправьте вопрос одним сообщением.",
       );
       return;
@@ -75,8 +75,8 @@ export async function messageHandler(ctx) {
         similarTicketId: similar.id,
       });
 
-      await MaxService.sendMessage(
-        ctx.recipient,
+      await sendBotMessage(
+        ctx,
         `💡 Похожий вопрос уже решали:\n\nТикет #${similar.ticketNumber} · закрыт ${daysAgo}\nВопрос: «${similar.description}»\nОтвет: «${answer}»`,
         getSimilarDecisionKeyboard(),
       );
@@ -86,8 +86,8 @@ export async function messageHandler(ctx) {
     await StateService.set(user.id, FSM_STATES.WAITING_SIMILAR_DECISION, {
       draftQuestion,
     });
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await sendBotMessage(
+      ctx,
       "Похожих решений не найдено. Нажмите «Создать тикет».",
       getSimilarDecisionKeyboard(),
     );
@@ -98,8 +98,8 @@ export async function messageHandler(ctx) {
     const description = text?.trim();
 
     if (!description) {
-      await MaxService.sendMessage(
-        ctx.recipient,
+      await sendBotMessage(
+        ctx,
         "Пожалуйста, отправьте текстовое описание вопроса.",
       );
       return;
@@ -113,8 +113,8 @@ export async function messageHandler(ctx) {
       nextPayload,
     );
 
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await sendBotMessage(
+      ctx,
       buildTicketSummary(nextPayload),
       getConfirmationKeyboard(),
     );
@@ -125,7 +125,7 @@ export async function messageHandler(ctx) {
     const answer = text?.trim();
 
     if (!answer) {
-      await MaxService.sendMessage(ctx.recipient, "Отправьте текстовый ответ.");
+      await sendBotMessage(ctx, "Отправьте текстовый ответ.");
       return;
     }
 
@@ -138,12 +138,12 @@ export async function messageHandler(ctx) {
     await StateService.clear(user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось сохранить ответ.");
+      await sendBotMessage(ctx, "Не удалось сохранить ответ.");
       return;
     }
 
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await sendBotMessage(
+      ctx,
       `Ответ отправлен. Обращение #${ticket.ticketNumber} снова в работе.`,
     );
 
@@ -162,6 +162,14 @@ export async function messageHandler(ctx) {
   if (state === FSM_STATES.WAITING_CLARIFY_COMMENT && role === ROLES.TEACHER) {
     const comment = text?.trim() === "-" ? null : text?.trim();
 
+    if (!payload.selectedTypes?.length && !comment) {
+      await sendBotMessage(
+        ctx,
+        "Напишите, что нужно уточнить у студента.",
+      );
+      return;
+    }
+
     const ticket = await TicketService.requestClarification(
       payload.ticketId,
       user.id,
@@ -172,11 +180,11 @@ export async function messageHandler(ctx) {
     await StateService.clear(user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось запросить уточнение.");
+      await sendBotMessage(ctx, "Не удалось запросить уточнение.");
       return;
     }
 
-    await MaxService.sendMessage(ctx.recipient, "Уточнение отправлено студенту.");
+    await sendBotMessage(ctx, "Уточнение отправлено студенту.");
 
     await NotificationService.notifyUserId(
       ticket.studentId,
@@ -194,7 +202,7 @@ export async function messageHandler(ctx) {
     const reply = text?.trim();
 
     if (!reply) {
-      await MaxService.sendMessage(ctx.recipient, "Введите текст ответа.");
+      await sendBotMessage(ctx, "Введите текст ответа.");
       return;
     }
 
@@ -207,11 +215,11 @@ export async function messageHandler(ctx) {
     await StateService.clear(user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось отправить ответ.");
+      await sendBotMessage(ctx, "Не удалось отправить ответ.");
       return;
     }
 
-    await MaxService.sendMessage(ctx.recipient, "Ответ отправлен.");
+    await sendBotMessage(ctx, "Ответ отправлен.");
 
     await NotificationService.notifyUserId(
       ticket.studentId,
@@ -232,7 +240,7 @@ export async function messageHandler(ctx) {
     const reason = text?.trim();
 
     if (!reason) {
-      await MaxService.sendMessage(ctx.recipient, "Укажите причину отказа.");
+      await sendBotMessage(ctx, "Укажите причину отказа.");
       return;
     }
 
@@ -246,7 +254,7 @@ export async function messageHandler(ctx) {
     await StateService.clear(user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось закрыть тикет.");
+      await sendBotMessage(ctx, "Не удалось закрыть тикет.");
       return;
     }
 
@@ -261,8 +269,8 @@ export async function messageHandler(ctx) {
       .filter(Boolean);
 
     if (!slots?.length) {
-      await MaxService.sendMessage(
-        ctx.recipient,
+      await sendBotMessage(
+        ctx,
         "Укажите хотя бы один слот через «;».",
       );
       return;
@@ -277,13 +285,13 @@ export async function messageHandler(ctx) {
     await StateService.clear(user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось сохранить слоты.");
+      await sendBotMessage(ctx, "Не удалось сохранить слоты.");
       return;
     }
 
-    await MaxService.sendMessage(
-      ctx.recipient,
-      `Слоты предложены. Статус: Назначено. После выбора студентом можно закрыть тикет.`,
+    await sendBotMessage(
+      ctx,
+      "Слоты предложены. Статус: Назначено. После выбора студентом можно закрыть тикет.",
     );
 
     await NotificationService.notifyUserId(
@@ -299,9 +307,9 @@ export async function messageHandler(ctx) {
   }
 
   if (state !== FSM_STATES.IDLE) {
-    await MaxService.sendMessage(
-      ctx.recipient,
-      "Завершите текущий шаг или отмените через /start.",
+    await sendBotMessage(
+      ctx,
+      "Завершите текущий шаг или нажмите «Главное меню».",
     );
     return;
   }

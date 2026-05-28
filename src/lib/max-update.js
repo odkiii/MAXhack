@@ -1,3 +1,5 @@
+import { fromMaxAttachments } from "@/lib/max-keyboard";
+
 function mapMaxUser(user) {
   if (!user || user.user_id == null) {
     return null;
@@ -146,6 +148,8 @@ function normalizeMessageCallback(raw) {
   }
 
   const recipient = extractRecipientFromCallback(raw, callback);
+  const attachments =
+    raw.message?.body?.attachments ?? raw.message?.attachments ?? [];
 
   return {
     update_type: raw.update_type,
@@ -159,6 +163,8 @@ function normalizeMessageCallback(raw) {
           raw.message?.body?.mid ??
           raw.message?.body?.message_id ??
           null,
+        text: extractText(raw.message),
+        keyboard: fromMaxAttachments(attachments),
         _maxRecipient: recipient,
       },
     },

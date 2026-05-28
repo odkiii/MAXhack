@@ -3,7 +3,11 @@ import { UserService } from "@/services/user.service";
 import { isConfiguredTeacher } from "@/bot/constants/categories";
 import { getRoleSelectionKeyboard, getPendingTeacherVerificationKeyboard } from "@/bot/keyboards/role.keyboard";
 import { sendMainMenuMessage } from "@/bot/helpers/menu.helper";
-import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
+import {
+  respondFromCallback,
+  sendBotMessage,
+  NAV_NONE,
+} from "@/bot/helpers/navigation.helper";
 
 export function hasCompletedRoleSelection(user) {
   if (!user) {
@@ -33,6 +37,7 @@ export async function showRoleSelection(ctx) {
     ctx,
     "Выберите роль для работы с ботом:",
     getRoleSelectionKeyboard(),
+    { ...NAV_NONE, showMainMenu: false },
   );
 }
 
@@ -41,6 +46,7 @@ export async function showPendingTeacherVerification(ctx) {
     ctx,
     "Ваш запрос на подтверждение преподавателя уже отправлен и ожидает решения администратора.",
     getPendingTeacherVerificationKeyboard(),
+    { showBack: false },
   );
 }
 
@@ -80,19 +86,21 @@ export async function sendUserAfterAuth(ctx) {
   }
 
   if (!hasCompletedRoleSelection(user)) {
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await sendBotMessage(
+      ctx,
       "Выберите роль для работы с ботом:",
       getRoleSelectionKeyboard(),
+      { showBack: false, showMainMenu: false },
     );
     return;
   }
 
   if (user.teacherVerificationStatus === "PENDING") {
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await sendBotMessage(
+      ctx,
       "Ваш запрос на подтверждение преподавателя уже отправлен и ожидает решения администратора.",
       getPendingTeacherVerificationKeyboard(),
+      { showBack: false },
     );
     return;
   }

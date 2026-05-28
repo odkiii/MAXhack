@@ -21,16 +21,25 @@ export class StateService {
   }
 
   static async set(userId, state, payload = {}) {
+    const record = await prisma.userState.findUnique({
+      where: { userId },
+    });
+    const existingNavStack = record?.payload?.navStack;
+    const mergedPayload =
+      existingNavStack !== undefined && payload.navStack === undefined
+        ? { ...payload, navStack: existingNavStack }
+        : payload;
+
     return prisma.userState.upsert({
       where: { userId },
       create: {
         userId,
         state,
-        payload,
+        payload: mergedPayload,
       },
       update: {
         state,
-        payload,
+        payload: mergedPayload,
       },
     });
   }

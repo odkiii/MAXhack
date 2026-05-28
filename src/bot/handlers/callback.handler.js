@@ -4,9 +4,14 @@ import { handleStudentCallback } from "@/bot/handlers/student.callback.handler";
 import { handleTeacherCallback } from "@/bot/handlers/teacher.callback.handler";
 import { UserService } from "@/services/user.service";
 import { NotificationService } from "@/services/notification.service";
+import { StateService } from "@/services/state.service";
+import { NavigationService } from "@/services/navigation.service";
 import { isAdmin } from "@/bot/helpers/admin.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
+import { handleNavigationBack } from "@/bot/helpers/navigation.helper";
+import { showMainMenu } from "@/bot/helpers/menu.helper";
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
+import { NAV_CALLBACKS } from "@/bot/constants/navigation";
 
 function buildPendingTeachersKeyboard(pending) {
   return {
@@ -54,6 +59,19 @@ async function showPendingTeachers(ctx) {
 
 export async function callbackHandler(ctx) {
   const { data } = ctx;
+
+  if (data === NAV_CALLBACKS.BACK) {
+    await handleNavigationBack(ctx);
+    return;
+  }
+
+  if (data === NAV_CALLBACKS.MAIN_MENU || data === "main_menu") {
+    await StateService.clear(ctx.user.id);
+    await NavigationService.clear(ctx.user.id);
+    await showMainMenu(ctx);
+    return;
+  }
+
   const role = resolveMenuRole(ctx.user);
 
   if (isAdmin(ctx.user) && data === "admin_pending_teachers") {

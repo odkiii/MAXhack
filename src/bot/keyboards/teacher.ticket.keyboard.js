@@ -1,4 +1,8 @@
 import { formatTicketListLabel } from "@/bot/helpers/ticket-format";
+import {
+  CLARIFICATION_LABELS,
+  CLARIFICATION_SELECTABLE_TYPES,
+} from "@/bot/constants/clarifications";
 
 export function getTeacherTicketActionsKeyboard(ticketId, status) {
   const rows = [];
@@ -33,25 +37,18 @@ export function getTeacherTicketActionsKeyboard(ticketId, status) {
 }
 
 export function getClarificationTypesKeyboard(ticketId, selected = []) {
-  const types = [
-    ["REPO_LINK", "Ссылка на репозиторий"],
-    ["GROUP_NUMBER", "Номер группы"],
-    ["ERROR_SCREENSHOT", "Скриншот ошибки"],
-    ["LESSON_TOPIC", "Тема занятия"],
-  ];
-
   return {
     inline_keyboard: [
-      ...types.map(([key, label]) => {
+      ...CLARIFICATION_SELECTABLE_TYPES.map((key) => {
         const on = selected.includes(key);
         return [
           {
-            text: `${on ? "✓ " : ""}${label}`,
+            text: `${on ? "✓ " : ""}${CLARIFICATION_LABELS[key]}`,
             callback_data: `t_clt_${ticketId}_${key}`,
           },
         ];
       }),
-      [{ text: "Готово → комментарий", callback_data: `t_clt_done_${ticketId}` }],
+      [{ text: "Другое (написать)", callback_data: `t_clt_done_${ticketId}` }],
       [{ text: "Отмена", callback_data: `t_view_${ticketId}` }],
     ],
   };
