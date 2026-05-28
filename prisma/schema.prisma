@@ -10,21 +10,58 @@ datasource db {
 enum Role {
   STUDENT
   TEACHER
+  MODERATOR
   ADMIN
 }
 
 enum TicketStatus {
-  OPEN
+  NEW
   IN_PROGRESS
+  AWAITING_CLARIFICATION
+  SCHEDULED
   CLOSED
   CANCELLED
 }
 
 enum TicketCategory {
-  ACADEMIC
-  TECHNICAL
-  CAREER
+  LAB
+  PROJECT
+  ACCESS
+  GRADING
+  RETAKE
   OTHER
+}
+
+enum CloseOutcome {
+  RESOLVED
+  REDIRECTED
+  REJECTED
+  CONSULTATION_SCHEDULED
+}
+
+enum TicketFeedback {
+  HELPFUL
+  NOT_HELPFUL
+}
+
+enum ClarificationType {
+  REPO_LINK
+  GROUP_NUMBER
+  ERROR_SCREENSHOT
+  LESSON_TOPIC
+}
+
+enum TicketEventType {
+  CREATED
+  ACCEPTED
+  CLARIFICATION_REQUESTED
+  CLARIFICATION_ANSWERED
+  TEACHER_REPLIED
+  SLOTS_PROPOSED
+  SLOT_SELECTED
+  CLOSED
+  FEEDBACK_LEFT
+  REASSIGNED
 }
 
 model User {
@@ -37,8 +74,9 @@ model User {
 
   consent          Consent?
   userState        UserState?
-  ticketsAsStudent Ticket[] @relation("StudentTickets")
-  ticketsAsTeacher Ticket[] @relation("TeacherTickets")
+  ticketsAsStudent Ticket[]       @relation("StudentTickets")
+  ticketsAsTeacher Ticket[]       @relation("TeacherTickets")
+  ticketEvents     TicketEvent[]  @relation("ActorEvents")
 }
 
 model Consent {
@@ -69,8 +107,34 @@ model Ticket {
   teacherId    String?
   teacher      User?          @relation("TeacherTickets", fields: [teacherId], references: [id], onDelete: SetNull)
   category     TicketCategory
-  status       TicketStatus   @default(OPEN)
+  status       TicketStatus   @default(NEW)
   description  String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  title        String?
+
+  clarificationTypes    ClarificationType[] @default([])
+  clarificationComment  String?
+  clarificationAnswer   String?
+  teacherResponse       String?
+  proposedSlots         Json?
+  selectedSlot          String?
+
+  closeOutcome CloseOutcome?
+  closeReason  String?
+  feedback     TicketFeedback?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events TicketEvent[]
+}
+
+model TicketEvent {
+  id        String          @id @default(cuid())
+  ticketId  String
+  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?           @relation("ActorEvents", fields: [actorId], references: [id], onDelete: SetNull)
+  type      TicketEventType
+  payload   Json            @default("{}")
+  createdAt DateTime        @default(now())
 }

@@ -1,6 +1,3 @@
-/**
- * Long polling for local testing WITHOUT webhook (only works if webhook is NOT active).
- */
 import "dotenv/config";
 import { getUpdates } from "../src/lib/max-api.js";
 import { normalizeUpdate } from "../src/lib/max-update.js";

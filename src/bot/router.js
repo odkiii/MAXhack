@@ -3,14 +3,12 @@ import { MaxService } from "@/services/max.service";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { messageHandler } from "@/bot/handlers/message.handler";
 import { callbackHandler } from "@/bot/handlers/callback.handler";
-import {
-  getChatIdFromMessage,
-  getChatIdFromCallback,
-} from "@/lib/utils";
+import { isStartCommand } from "@/lib/max-update";
+
 function getRecipientFromMessage(message) {
   return (
     message?._maxRecipient ?? {
-      chatId: getChatIdFromMessage(message),
+      chatId: null,
       chatType: "dialog",
       userId: message?.from?.id ?? null,
     }
@@ -20,7 +18,7 @@ function getRecipientFromMessage(message) {
 function getRecipientFromCallback(callbackQuery) {
   return (
     callbackQuery?.message?._maxRecipient ?? {
-      chatId: getChatIdFromCallback(callbackQuery),
+      chatId: null,
       chatType: "dialog",
       userId: callbackQuery?.from?.id ?? null,
     }
@@ -30,15 +28,21 @@ function getRecipientFromCallback(callbackQuery) {
 export async function botRouter(update) {
   if (update.message) {
     const { message } = update;
-    const from = message.from ?? { id: message.chat?.id };
+    const from = message.from;
+
+    if (!from?.id) {
+      console.warn("[botRouter] message without from.id");
+      return;
+    }
+
     const user = await UserService.findOrCreate(from);
     const recipient = getRecipientFromMessage(message);
-    const chatId = recipient.chatId ?? recipient.userId;
+    const chatId = recipient.userId ?? recipient.chatId;
     const text = message.text ?? "";
 
     const ctx = { user, chatId, recipient, text, message, update };
 
-    if (text.startsWith("/start")) {
+    if (isStartCommand(text) || update.update_type === "bot_started") {
       await startHandler(ctx);
       return;
     }
@@ -50,9 +54,15 @@ export async function botRouter(update) {
   if (update.callback_query) {
     const { callback_query: callbackQuery } = update;
     const from = callbackQuery.from;
+
+    if (!from?.id) {
+      console.warn("[botRouter] callback without from.id");
+      return;
+    }
+
     const user = await UserService.findOrCreate(from);
     const recipient = getRecipientFromCallback(callbackQuery);
-    const chatId = recipient.chatId ?? recipient.userId;
+    const chatId = recipient.userId ?? recipient.chatId;
     const data = callbackQuery.data ?? "";
 
     await MaxService.answerCallbackQuery(callbackQuery);

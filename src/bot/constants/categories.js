@@ -1,15 +1,19 @@
 export const TICKET_CATEGORIES = {
-  ACADEMIC: "ACADEMIC",
-  TECHNICAL: "TECHNICAL",
-  CAREER: "CAREER",
+  LAB: "LAB",
+  PROJECT: "PROJECT",
+  ACCESS: "ACCESS",
+  GRADING: "GRADING",
+  RETAKE: "RETAKE",
   OTHER: "OTHER",
 };
 
 export const CATEGORY_LABELS = {
-  [TICKET_CATEGORIES.ACADEMIC]: "Учёба",
-  [TICKET_CATEGORIES.TECHNICAL]: "Технические вопросы",
-  [TICKET_CATEGORIES.CAREER]: "Карьера",
-  [TICKET_CATEGORIES.OTHER]: "Другое",
+  [TICKET_CATEGORIES.LAB]: "Лабораторные работы",
+  [TICKET_CATEGORIES.PROJECT]: "Проект",
+  [TICKET_CATEGORIES.ACCESS]: "Доступы",
+  [TICKET_CATEGORIES.GRADING]: "Оценивание",
+  [TICKET_CATEGORIES.RETAKE]: "Пересдача",
+  [TICKET_CATEGORIES.OTHER]: "Прочее",
 };
 
 export const TEACHERS = [
@@ -32,4 +36,12 @@ export const TEACHERS = [
 
 export function getTeacherByKey(key) {
   return TEACHERS.find((teacher) => teacher.key === key) ?? null;
+}
+
+export function getTeacherByMaxUserId(maxUserId) {
+  return TEACHERS.find((t) => t.maxUserId === String(maxUserId)) ?? null;
+}
+
+export function isConfiguredTeacher(maxUserId) {
+  return Boolean(getTeacherByMaxUserId(maxUserId));
 }

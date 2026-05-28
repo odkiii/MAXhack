@@ -1,68 +1,260 @@
 import { StateService } from "@/services/state.service";
+import { TicketService } from "@/services/ticket.service";
 import { MaxService } from "@/services/max.service";
-import { FSM_STATES } from "@/bot/states/ticketCreation.states";
+import { NotificationService } from "@/services/notification.service";
+import { FSM_STATES } from "@/bot/states/user.states";
 import { getConfirmationKeyboard } from "@/bot/keyboards/ticket.keyboard";
-import {
-  CATEGORY_LABELS,
-  getTeacherByKey,
-} from "@/bot/constants/categories";
+import { CATEGORY_LABELS, getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
+import { isStartCommand } from "@/lib/max-update";
+import { showMainMenu, resolveMenuRole } from "@/bot/helpers/menu.helper";
+import { ROLES } from "@/bot/constants/roles";
+import { finalizeClose } from "@/bot/handlers/teacher.callback.handler";
+import { CLOSE_OUTCOMES } from "@/bot/constants/statuses";
+import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
+import { PII_WARNING } from "@/bot/texts/legal";
 
 function buildTicketSummary(payload) {
   const teacher = getTeacherByKey(payload.teacherKey);
   const categoryLabel = CATEGORY_LABELS[payload.category] ?? payload.category;
 
-  return `Проверьте данные тикета:
+  return `Проверьте обращение:
 
 Преподаватель: ${teacher?.displayName ?? "—"}
 Категория: ${categoryLabel}
 Описание: ${payload.description}
 
-Подтвердите создание тикета или отмените.`;
+${PII_WARNING}
+
+Подтвердите отправку или отмените.`;
 }
 
 export async function messageHandler(ctx) {
-  const { user, chatId, text } = ctx;
+  const { user, text } = ctx;
 
-  if (text === "/start") {
+  if (isStartCommand(text)) {
     await startHandler(ctx);
     return;
   }
 
   const { state, payload } = await StateService.get(user.id);
+  const role = resolveMenuRole(user);
 
-  if (state !== FSM_STATES.WAITING_DESCRIPTION) {
+  if (state === FSM_STATES.WAITING_DESCRIPTION && role === ROLES.STUDENT) {
+    const description = text?.trim();
+
+    if (!description) {
+      await MaxService.sendMessage(
+        ctx.recipient,
+        "Пожалуйста, отправьте текстовое описание вопроса.",
+      );
+      return;
+    }
+
+    const nextPayload = { ...payload, description };
+
+    await StateService.set(
+      user.id,
+      FSM_STATES.WAITING_CONFIRMATION,
+      nextPayload,
+    );
+
     await MaxService.sendMessage(
       ctx.recipient,
-      "Используйте меню или команду /start.",
+      buildTicketSummary(nextPayload),
+      getConfirmationKeyboard(),
     );
     return;
   }
 
-  const description = text?.trim();
+  if (state === FSM_STATES.WAITING_CLARIFICATION_REPLY) {
+    const answer = text?.trim();
 
-  if (!description) {
+    if (!answer) {
+      await MaxService.sendMessage(ctx.recipient, "Отправьте текстовый ответ.");
+      return;
+    }
+
+    const ticket = await TicketService.answerClarification(
+      payload.ticketId,
+      user.id,
+      answer,
+    );
+
+    await StateService.clear(user.id);
+
+    if (!ticket) {
+      await MaxService.sendMessage(ctx.recipient, "Не удалось сохранить ответ.");
+      return;
+    }
+
     await MaxService.sendMessage(
       ctx.recipient,
-      "Пожалуйста, отправьте текстовое описание вопроса.",
+      `Ответ отправлен. Обращение #${ticket.ticketNumber} снова в работе.`,
+    );
+
+    await NotificationService.notifyUserId(
+      ticket.teacherId,
+      `Студент ответил на уточнение по #${ticket.ticketNumber}:\n${answer}`,
+      {
+        inline_keyboard: [
+          [{ text: "Открыть", callback_data: `t_view_${ticket.id}` }],
+        ],
+      },
     );
     return;
   }
 
-  const nextPayload = {
-    ...payload,
-    description,
-  };
+  if (state === FSM_STATES.WAITING_CLARIFY_COMMENT && role === ROLES.TEACHER) {
+    const comment = text?.trim() === "-" ? null : text?.trim();
 
-  await StateService.set(
-    user.id,
-    FSM_STATES.WAITING_CONFIRMATION,
-    nextPayload,
-  );
+    const ticket = await TicketService.requestClarification(
+      payload.ticketId,
+      user.id,
+      payload.selectedTypes,
+      comment,
+    );
+
+    await StateService.clear(user.id);
+
+    if (!ticket) {
+      await MaxService.sendMessage(ctx.recipient, "Не удалось запросить уточнение.");
+      return;
+    }
+
+    await MaxService.sendMessage(ctx.recipient, "Уточнение отправлено студенту.");
+
+    await NotificationService.notifyUserId(
+      ticket.studentId,
+      `По обращению #${ticket.ticketNumber} нужно уточнение.`,
+      {
+        inline_keyboard: [
+          [{ text: "Ответить", callback_data: `st_clarify_${ticket.id}` }],
+        ],
+      },
+    );
+    return;
+  }
+
+  if (state === FSM_STATES.WAITING_TEACHER_REPLY && role === ROLES.TEACHER) {
+    const reply = text?.trim();
+
+    if (!reply) {
+      await MaxService.sendMessage(ctx.recipient, "Введите текст ответа.");
+      return;
+    }
+
+    const ticket = await TicketService.addTeacherReply(
+      payload.ticketId,
+      user.id,
+      reply,
+    );
+
+    await StateService.clear(user.id);
+
+    if (!ticket) {
+      await MaxService.sendMessage(ctx.recipient, "Не удалось отправить ответ.");
+      return;
+    }
+
+    await MaxService.sendMessage(ctx.recipient, "Ответ отправлен.");
+
+    await NotificationService.notifyUserId(
+      ticket.studentId,
+      `Ответ по обращению #${ticket.ticketNumber}:\n\n${reply}`,
+      {
+        inline_keyboard: [
+          [
+            { text: "Закрыть (получил ответ)", callback_data: `st_close_${ticket.id}` },
+          ],
+          [{ text: "Статус", callback_data: `st_view_${ticket.id}` }],
+        ],
+      },
+    );
+    return;
+  }
+
+  if (state === FSM_STATES.WAITING_REJECT_REASON && role === ROLES.TEACHER) {
+    const reason = text?.trim();
+
+    if (!reason) {
+      await MaxService.sendMessage(ctx.recipient, "Укажите причину отказа.");
+      return;
+    }
+
+    const ticket = await TicketService.close(
+      payload.ticketId,
+      user.id,
+      CLOSE_OUTCOMES.REJECTED,
+      reason,
+    );
+
+    await StateService.clear(user.id);
+
+    if (!ticket) {
+      await MaxService.sendMessage(ctx.recipient, "Не удалось закрыть тикет.");
+      return;
+    }
+
+    await finalizeClose(ctx, ticket);
+    return;
+  }
+
+  if (state === FSM_STATES.WAITING_CONSULTATION_SLOTS && role === ROLES.TEACHER) {
+    const slots = text
+      ?.split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!slots?.length) {
+      await MaxService.sendMessage(
+        ctx.recipient,
+        "Укажите хотя бы один слот через «;».",
+      );
+      return;
+    }
+
+    const ticket = await TicketService.proposeSlots(
+      payload.ticketId,
+      user.id,
+      slots,
+    );
+
+    await StateService.clear(user.id);
+
+    if (!ticket) {
+      await MaxService.sendMessage(ctx.recipient, "Не удалось сохранить слоты.");
+      return;
+    }
+
+    await MaxService.sendMessage(
+      ctx.recipient,
+      `Слоты предложены. Статус: Назначено. После выбора студентом можно закрыть тикет.`,
+    );
+
+    await NotificationService.notifyUserId(
+      ticket.studentId,
+      `По обращению #${ticket.ticketNumber} предложены слоты консультации:\n${slots.join("\n")}`,
+      {
+        inline_keyboard: [
+          [{ text: "Выбрать слот", callback_data: `st_slots_${ticket.id}` }],
+        ],
+      },
+    );
+    return;
+  }
+
+  if (state !== FSM_STATES.IDLE) {
+    await MaxService.sendMessage(
+      ctx.recipient,
+      "Завершите текущий шаг или отмените через /start.",
+    );
+    return;
+  }
 
   await MaxService.sendMessage(
     ctx.recipient,
-    buildTicketSummary(nextPayload),
-    getConfirmationKeyboard(),
+    "Используйте меню или команду /start.",
   );
+  await showMainMenu(ctx);
 }

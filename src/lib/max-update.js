@@ -11,16 +11,34 @@ function mapMaxUser(user) {
   };
 }
 
-function extractRecipient(message) {
+function extractRecipientFromMessage(message) {
   const recipient = message?.recipient ?? {};
+  const sender = message?.sender;
+  const chatType = recipient.chat_type ?? "dialog";
+
+  let userId = recipient.user_id ?? null;
+
+  if (chatType === "dialog" && sender && !sender.is_bot) {
+    userId = sender.user_id;
+  }
 
   return {
     chatId: recipient.chat_id ?? null,
-    chatType: recipient.chat_type ?? "dialog",
-    userId:
-      recipient.user_id ??
-      (recipient.chat_type === "dialog" ? message?.sender?.user_id : null) ??
-      null,
+    chatType,
+    userId,
+  };
+}
+
+function extractRecipientFromCallback(raw, callback) {
+  const from = mapMaxUser(callback?.user);
+  const messageRecipient = raw.message
+    ? extractRecipientFromMessage(raw.message)
+    : null;
+
+  return {
+    chatId: messageRecipient?.chatId ?? raw.chat_id ?? null,
+    chatType: messageRecipient?.chatType ?? "dialog",
+    userId: from?.id ?? messageRecipient?.userId ?? null,
   };
 }
 
@@ -33,7 +51,11 @@ export function normalizeUpdate(raw) {
     return null;
   }
 
-  if (raw.message || raw.callback_query) {
+  if (raw.message?.from?.id != null && raw.message?.text !== undefined) {
+    return raw;
+  }
+
+  if (raw.callback_query?.from?.id != null && raw.callback_query?.data !== undefined) {
     return raw;
   }
 
@@ -51,6 +73,31 @@ export function normalizeUpdate(raw) {
     return normalizeBotStarted(raw);
   }
 
+  console.log("[MAX] unsupported update_type:", updateType);
+  return null;
+}
+
+export function extractReplyRecipient(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  if (raw.update_type === "message_callback" && raw.callback?.user) {
+    return extractRecipientFromCallback(raw, raw.callback);
+  }
+
+  if (raw.message) {
+    return extractRecipientFromMessage(raw.message);
+  }
+
+  if (raw.user?.user_id != null) {
+    return {
+      chatId: raw.chat_id ?? null,
+      chatType: "dialog",
+      userId: raw.user.user_id,
+    };
+  }
+
   return null;
 }
 
@@ -62,14 +109,22 @@ function normalizeMessageCreated(raw) {
   }
 
   const sender = mapMaxUser(message.sender);
-  const recipient = extractRecipient(message);
+  const recipient = extractRecipientFromMessage(message);
   const text = extractText(message);
+  const from =
+    sender ??
+    (recipient.userId != null ? { id: recipient.userId } : null);
+
+  if (!from) {
+    console.warn("[MAX] message_created without sender/user_id");
+    return null;
+  }
 
   return {
     update_type: raw.update_type,
     message: {
       text,
-      from: sender,
+      from,
       chat: { id: recipient.chatId ?? recipient.userId },
       _maxRecipient: recipient,
     },
@@ -78,18 +133,19 @@ function normalizeMessageCreated(raw) {
 
 function normalizeMessageCallback(raw) {
   const callback = raw.callback;
-  const message = raw.message;
 
   if (!callback) {
     return null;
   }
 
   const from = mapMaxUser(callback.user);
-  const recipient = message ? extractRecipient(message) : {
-    chatId: raw.chat_id ?? null,
-    chatType: "dialog",
-    userId: from?.id ?? null,
-  };
+
+  if (!from) {
+    console.warn("[MAX] message_callback without callback.user");
+    return null;
+  }
+
+  const recipient = extractRecipientFromCallback(raw, callback);
 
   return {
     update_type: raw.update_type,
@@ -97,15 +153,10 @@ function normalizeMessageCallback(raw) {
       id: callback.callback_id,
       data: callback.payload ?? "",
       from,
-      message: message
-        ? {
-            chat: { id: recipient.chatId ?? recipient.userId },
-            _maxRecipient: recipient,
-          }
-        : {
-            chat: { id: recipient.chatId ?? recipient.userId },
-            _maxRecipient: recipient,
-          },
+      message: {
+        chat: { id: recipient.chatId ?? recipient.userId },
+        _maxRecipient: recipient,
+      },
     },
   };
 }
@@ -117,16 +168,15 @@ function normalizeBotStarted(raw) {
     mapMaxUser(raw.callback?.user);
 
   if (!user) {
+    console.warn("[MAX] bot_started without user");
     return null;
   }
 
-  const recipient = raw.message
-    ? extractRecipient(raw.message)
-    : {
-        chatId: raw.chat_id ?? user.id,
-        chatType: "dialog",
-        userId: user.id,
-      };
+  const recipient = {
+    chatId: raw.chat_id ?? null,
+    chatType: "dialog",
+    userId: user.id,
+  };
 
   return {
     update_type: raw.update_type,
@@ -143,7 +193,13 @@ export function getRecipientFromContext(ctx) {
   const fromMessage = ctx.message?._maxRecipient;
   const fromCallback = ctx.callbackQuery?.message?._maxRecipient;
 
-  return fromMessage ?? fromCallback ?? buildRecipientFromChatId(ctx.chatId);
+  return (
+    fromMessage ??
+    fromCallback ??
+    (ctx.recipient
+      ? ctx.recipient
+      : buildRecipientFromChatId(ctx.chatId))
+  );
 }
 
 function buildRecipientFromChatId(chatId) {
@@ -152,8 +208,14 @@ function buildRecipientFromChatId(chatId) {
   }
 
   return {
-    chatId,
+    chatId: null,
     chatType: "dialog",
     userId: chatId,
   };
+}
+
+export function isStartCommand(text) {
+  const trimmed = (text ?? "").trim();
+  const first = trimmed.split(/\s+/)[0] ?? "";
+  return first === "/start" || first.startsWith("/start@");
 }

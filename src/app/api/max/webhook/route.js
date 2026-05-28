@@ -1,5 +1,8 @@
 import { botRouter } from "@/bot/router";
-import { normalizeUpdate } from "@/lib/max-update";
+import { normalizeUpdate, extractReplyRecipient } from "@/lib/max-update";
+import { sendMessage } from "@/lib/max-api";
+
+export const runtime = "nodejs";
 
 function verifyWebhookSecret(request) {
   const secret = (process.env.MAX_WEBHOOK_SECRET || "").trim();
@@ -15,18 +18,21 @@ function verifyWebhookSecret(request) {
 
 export async function POST(request) {
   if (!verifyWebhookSecret(request)) {
+    console.error("[MAX Webhook] 403 — secret mismatch (check MAX_WEBHOOK_SECRET on Vercel and in subscription)");
     return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  try {
-    const raw = await request.json();
+  let raw = null;
 
-    console.log("[MAX Webhook]", JSON.stringify(raw, null, 2));
+  try {
+    raw = await request.json();
+
+    console.log("[MAX Webhook]", raw.update_type ?? "legacy", JSON.stringify(raw).slice(0, 500));
 
     const update = normalizeUpdate(raw);
 
     if (!update) {
-      console.log("[MAX Webhook] unsupported update, skipped");
+      console.log("[MAX Webhook] skipped — unsupported or invalid payload");
       return Response.json({ ok: true });
     }
 
@@ -34,12 +40,22 @@ export async function POST(request) {
 
     return Response.json({ ok: true });
   } catch (error) {
-    console.error("[MAX Webhook Error]", error);
+    console.error("[MAX Webhook Error]", error?.message, error?.data ?? error);
 
-    return Response.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 },
-    );
+    try {
+      const recipient = raw ? extractReplyRecipient(raw) : null;
+
+      if (recipient?.userId != null && process.env.MAX_BOT_TOKEN) {
+        await sendMessage(
+          recipient,
+          "Произошла ошибка. Попробуйте снова отправить /start или нажмите «Запустить» в чате с ботом.",
+        );
+      }
+    } catch (notifyError) {
+      console.error("[MAX Webhook] failed to notify user:", notifyError?.message);
+    }
+
+    return Response.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
 }
 

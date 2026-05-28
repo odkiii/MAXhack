@@ -27,6 +27,20 @@ export function getAuthorizationHeader() {
   return token;
 }
 
+function coerceApiId(id) {
+  if (id == null) {
+    return null;
+  }
+
+  const num = Number(id);
+
+  if (Number.isFinite(num) && String(num) === String(id).trim()) {
+    return num;
+  }
+
+  return id;
+}
+
 export async function maxApiRequest(path, options = {}) {
   const { method = "GET", params, body } = options;
   const url = new URL(`${getApiUrl()}${path}`);
@@ -118,7 +132,7 @@ export async function getUpdates({ marker, limit = 50, timeout = 25 } = {}) {
 
 export async function sendMessage(recipient, text, attachments = null) {
   const params = buildMessageQueryParams(recipient);
-  const body = { text };
+  const body = { text: text ?? "" };
 
   if (attachments?.length) {
     body.attachments = attachments;
@@ -142,6 +156,10 @@ export async function answerCallback(callbackId, { notification, message } = {})
     body.message = message;
   }
 
+  if (!body.notification && !body.message) {
+    body.notification = "OK";
+  }
+
   return maxApiRequest("/answers", {
     method: "POST",
     params: { callback_id: callbackId },
@@ -150,20 +168,20 @@ export async function answerCallback(callbackId, { notification, message } = {})
 }
 
 export function buildMessageQueryParams(recipient) {
-  const chatType = (recipient?.chatType || "").toLowerCase();
+  const chatType = (recipient?.chatType ?? "dialog").toLowerCase();
 
   if (chatType === "chat" || chatType === "channel") {
-    if (recipient.chatId != null) {
-      return { chat_id: recipient.chatId };
+    if (recipient?.chatId != null) {
+      return { chat_id: coerceApiId(recipient.chatId) };
     }
   }
 
   if (recipient?.userId != null) {
-    return { user_id: recipient.userId };
+    return { user_id: coerceApiId(recipient.userId) };
   }
 
   if (recipient?.chatId != null) {
-    return { chat_id: recipient.chatId };
+    return { chat_id: coerceApiId(recipient.chatId) };
   }
 
   throw new Error("Cannot send message: missing userId and chatId");

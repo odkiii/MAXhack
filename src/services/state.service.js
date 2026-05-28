@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { FSM_STATES } from "@/bot/states/ticketCreation.states";
+import { FSM_STATES } from "@/bot/states/user.states";
 
 export class StateService {
   static async get(userId) {

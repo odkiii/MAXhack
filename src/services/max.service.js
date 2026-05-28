@@ -1,26 +1,19 @@
 import { sendMessage, answerCallback } from "@/lib/max-api";
 import { toMaxAttachments } from "@/lib/max-keyboard";
-import { getRecipientFromContext } from "@/lib/max-update";
 
 export class MaxService {
-  /**
-   * @param {object|string|number} target - recipient { userId, chatId, chatType } or legacy chatId
-   */
   static async sendMessage(target, text, keyboard = null) {
     const recipient = resolveRecipient(target);
     const attachments = toMaxAttachments(keyboard);
 
     if (!process.env.MAX_BOT_TOKEN) {
-      console.log("[MAX API mock]", { recipient, text, keyboard });
+      console.log("[MAX API mock]", { recipient, textPreview: text?.slice(0, 60) });
       return { ok: true, mock: true };
     }
 
     try {
       const result = await sendMessage(recipient, text, attachments);
-      console.log("[MAX API] message sent", {
-        recipient,
-        textPreview: text.slice(0, 80),
-      });
+      console.log("[MAX API] sent", { userId: recipient.userId, chatId: recipient.chatId });
       return result;
     } catch (error) {
       console.error("[MAX API] send failed", {
@@ -28,16 +21,16 @@ export class MaxService {
         data: error.data,
         recipient,
       });
+
+      if (error.status === 401 && process.env.MAX_USE_BEARER !== "1") {
+        console.error("[MAX API] Tip: set MAX_USE_BEARER=1 in Vercel env and redeploy");
+      }
+
       throw error;
     }
   }
 
-  static async sendFromContext(ctx, text, keyboard = null) {
-    const recipient = getRecipientFromContext(ctx);
-    return this.sendMessage(recipient, text, keyboard);
-  }
-
-  static async answerCallbackQuery(callbackQuery, notification = null) {
+  static async answerCallbackQuery(callbackQuery, notification = "OK") {
     const callbackId = callbackQuery?.id;
 
     if (!callbackId || !process.env.MAX_BOT_TOKEN) {
@@ -45,9 +38,7 @@ export class MaxService {
     }
 
     try {
-      return await answerCallback(callbackId, {
-        notification: notification ?? undefined,
-      });
+      return await answerCallback(callbackId, { notification });
     } catch (error) {
       console.error("[MAX API] callback answer failed", {
         status: error.status,
@@ -58,12 +49,20 @@ export class MaxService {
 }
 
 function resolveRecipient(target) {
-  if (target && typeof target === "object" && ("chatType" in target || "userId" in target)) {
-    return target;
+  if (
+    target &&
+    typeof target === "object" &&
+    ("chatType" in target || "userId" in target || "chatId" in target)
+  ) {
+    return {
+      chatId: target.chatId ?? null,
+      chatType: target.chatType ?? "dialog",
+      userId: target.userId ?? null,
+    };
   }
 
   return {
-    chatId: target,
+    chatId: null,
     chatType: "dialog",
     userId: target,
   };

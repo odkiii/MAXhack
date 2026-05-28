@@ -59,6 +59,13 @@ async function main() {
 
     const secret = process.env.MAX_WEBHOOK_SECRET?.trim();
 
+    if (secret && !/^[A-Za-z0-9-]+$/.test(secret)) {
+      console.error(
+        "MAX_WEBHOOK_SECRET: only A-Z, a-z, 0-9 and hyphen allowed (MAX API rejects Cyrillic).",
+      );
+      process.exit(1);
+    }
+
     const result = await setSubscription({
       url: webhookUrl,
       secret: secret || undefined,
