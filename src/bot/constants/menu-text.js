@@ -10,6 +10,7 @@ export const MENU_TEXT = {
   ACTIVE: "Активные тикеты",
   CLOSED: "Закрытые тикеты",
   DIAG: "Диагностика",
+  METRICS: "Мои метрики",
 };
 
 const STUDENT_ACTIONS = new Map([
@@ -27,6 +28,7 @@ const TEACHER_ACTIONS = new Map([
   [MENU_TEXT.CLOSED, "t_closed"],
   [MENU_TEXT.DIAG, "t_diag"],
   [MENU_TEXT.HELP, "help"],
+  [MENU_TEXT.METRICS, "t_metrics"],
 ]);
 
 export function resolveMenuTextAction(text, role) {

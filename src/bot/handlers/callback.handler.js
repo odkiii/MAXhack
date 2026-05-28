@@ -10,6 +10,10 @@ import { isAdmin } from "@/bot/helpers/admin.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { handleNavigationBack } from "@/bot/helpers/navigation.helper";
 import { showMainMenu } from "@/bot/helpers/menu.helper";
+import {
+  showAdminTeacherMetricsPage,
+  showAdminTeacherMetricsDetail,
+} from "@/bot/helpers/metrics.helper";
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { NAV_CALLBACKS } from "@/bot/constants/navigation";
 
@@ -76,6 +80,32 @@ export async function callbackHandler(ctx) {
 
   if (isAdmin(ctx.user) && data === "admin_pending_teachers") {
     await showPendingTeachers(ctx);
+    return;
+  }
+
+  if (isAdmin(ctx.user) && data === "admin_teacher_metrics") {
+    await showAdminTeacherMetricsPage(ctx, 0);
+    return;
+  }
+
+  if (isAdmin(ctx.user) && data.startsWith("admin_mpage_")) {
+    if (data === "admin_mpage_noop") {
+      return;
+    }
+
+    const page = Number.parseInt(data.replace("admin_mpage_", ""), 10);
+
+    if (Number.isNaN(page)) {
+      return;
+    }
+
+    await showAdminTeacherMetricsPage(ctx, page);
+    return;
+  }
+
+  if (isAdmin(ctx.user) && data.startsWith("admin_mview_")) {
+    const teacherId = data.replace("admin_mview_", "");
+    await showAdminTeacherMetricsDetail(ctx, teacherId);
     return;
   }
 

@@ -25,6 +25,12 @@ export function getStudentMenuKeyboard(user) {
         "admin_pending_teachers",
       ),
     ]);
+    rows.push([
+      callbackButton(
+        "Метрики преподавателей",
+        "admin_teacher_metrics",
+      ),
+    ]);
   }
 
   return { inline_keyboard: rows };

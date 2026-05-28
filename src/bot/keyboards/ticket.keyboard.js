@@ -1,10 +1,25 @@
 import { TEACHERS } from "@/bot/constants/categories";
+import {
+  CATEGORY_OPTIONS,
+  CATEGORY_LABELS,
+} from "@/bot/constants/ticket-categories";
 
 export function getConfirmationKeyboard() {  return {
     inline_keyboard: [
       [{ text: "Подтвердить отправку", callback_data: "confirm_ticket" }],
       [{ text: "Отмена", callback_data: "cancel_ticket" }],
     ],
+  };
+}
+
+export function getCategoryKeyboard() {
+  return {
+    inline_keyboard: CATEGORY_OPTIONS.map((category) => [
+      {
+        text: CATEGORY_LABELS[category],
+        callback_data: `cat_${category}`,
+      },
+    ]),
   };
 }
 
@@ -43,11 +58,13 @@ export function getStudentTicketActionsKeyboard(ticket) {
   ];
 
   if (
-    ticket.status === "IN_PROGRESS" &&
-    ticket.teacherResponse
+    ticket.teacherResponse &&
+    !ticket.feedback &&
+    ["IN_PROGRESS", "CLOSED"].includes(ticket.status)
   ) {
     rows.push([
-      { text: "Закрыть (получил ответ)", callback_data: `st_close_${ticket.id}` },
+      { text: "Полезно", callback_data: `fb_yes_${ticket.id}` },
+      { text: "Не полезно", callback_data: `fb_no_${ticket.id}` },
     ]);
   }
 
@@ -60,13 +77,6 @@ export function getStudentTicketActionsKeyboard(ticket) {
   if (ticket.status === "SCHEDULED" && ticket.proposedSlots && !ticket.selectedSlot) {
     rows.push([
       { text: "Выбрать слот", callback_data: `st_slots_${ticket.id}` },
-    ]);
-  }
-
-  if (ticket.status === "CLOSED" && !ticket.feedback) {
-    rows.push([
-      { text: "Полезно", callback_data: `fb_yes_${ticket.id}` },
-      { text: "Не полезно", callback_data: `fb_no_${ticket.id}` },
     ]);
   }
 

@@ -3,10 +3,9 @@ import { TicketService } from "@/services/ticket.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
 import {
-  getConfirmationKeyboard,
   getSimilarDecisionKeyboard,
+  getCategoryKeyboard,
 } from "@/bot/keyboards/ticket.keyboard";
-import { getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
 import { showMainMenu, resolveMenuRole, sendMainMenuMessage } from "@/bot/helpers/menu.helper";
@@ -16,24 +15,7 @@ import { dispatchMenuTextAction } from "@/bot/helpers/menu-actions.helper";
 import { ROLES } from "@/bot/constants/roles";
 import { finalizeClose } from "@/bot/handlers/teacher.callback.handler";
 import { CLOSE_OUTCOMES } from "@/bot/constants/statuses";
-import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
-import { PII_WARNING } from "@/bot/texts/legal";
-
-function buildTicketSummary(payload) {
-  const teacherName =
-    payload.teacherDisplayName ??
-    getTeacherByKey(payload.teacherKey)?.displayName ??
-    "—";
-
-  return `Проверьте обращение:
-
-Преподаватель: ${teacherName}
-Текст: ${payload.description}
-
-${PII_WARNING}
-
-Подтвердите отправку или отмените.`;
-}
+import { getFeedbackKeyboard, buildAnswerFeedbackPrompt } from "@/bot/keyboards/feedback.keyboard";
 
 export async function messageHandler(ctx) {
   const { user, text } = ctx;
@@ -107,16 +89,12 @@ export async function messageHandler(ctx) {
 
     const nextPayload = { ...payload, description };
 
-    await StateService.set(
-      user.id,
-      FSM_STATES.WAITING_CONFIRMATION,
-      nextPayload,
-    );
+    await StateService.set(user.id, FSM_STATES.WAITING_CATEGORY, nextPayload);
 
     await sendBotMessage(
       ctx,
-      buildTicketSummary(nextPayload),
-      getConfirmationKeyboard(),
+      "Выберите категорию обращения:",
+      getCategoryKeyboard(),
     );
     return;
   }
@@ -223,15 +201,8 @@ export async function messageHandler(ctx) {
 
     await NotificationService.notifyUserId(
       ticket.studentId,
-      `Ответ по обращению #${ticket.ticketNumber}:\n\n${reply}`,
-      {
-        inline_keyboard: [
-          [
-            { text: "Закрыть (получил ответ)", callback_data: `st_close_${ticket.id}` },
-          ],
-          [{ text: "Статус", callback_data: `st_view_${ticket.id}` }],
-        ],
-      },
+      buildAnswerFeedbackPrompt(ticket.ticketNumber, reply),
+      getFeedbackKeyboard(ticket.id),
     );
     return;
   }

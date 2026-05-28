@@ -9,9 +9,11 @@ import {
   getClarificationTypesKeyboard,
   getCloseOutcomeKeyboard,
   getTicketListKeyboard,
+  hasClarificationBeenRequested,
 } from "@/bot/keyboards/teacher.ticket.keyboard";
-import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
+import { getFeedbackKeyboard, buildClosedTicketFeedbackPrompt } from "@/bot/keyboards/feedback.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
+import { showTeacherOwnMetrics } from "@/bot/helpers/metrics.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { formatTicketCard } from "@/bot/helpers/ticket-format";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
@@ -22,6 +24,11 @@ export async function handleTeacherCallback(ctx, data) {
 
   if (data === "help") {
     await showHelp(ctx);
+    return true;
+  }
+
+  if (data === "t_metrics") {
+    await showTeacherOwnMetrics(ctx);
     return true;
   }
 
@@ -103,7 +110,7 @@ export async function handleTeacherCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       formatTicketCard(ticket, { full: true }),
-      getTeacherTicketActionsKeyboard(ticket.id, ticket.status),
+      getTeacherTicketActionsKeyboard(ticket),
     );
     return true;
   }
@@ -120,7 +127,7 @@ export async function handleTeacherCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       `Тикет #${ticket.ticketNumber} принят в работу.`,
-      getTeacherTicketActionsKeyboard(ticket.id, ticket.status),
+      getTeacherTicketActionsKeyboard(ticket),
     );
 
     await NotificationService.notifyUserId(
@@ -141,6 +148,15 @@ export async function handleTeacherCallback(ctx, data) {
 
     if (!ticket) {
       await respondFromCallback(ctx, "Тикет не найден.");
+      return true;
+    }
+
+    if (hasClarificationBeenRequested(ticket)) {
+      await respondFromCallback(
+        ctx,
+        "Уточнение по этому обращению уже запрашивалось.",
+        getTeacherTicketActionsKeyboard(ticket),
+      );
       return true;
     }
 
@@ -379,13 +395,19 @@ export async function finalizeClose(ctx, ticket) {
     `Тикет #${ticket.ticketNumber} закрыт. Итог: ${label}`,
   );
 
+  if (!ticket.teacherResponse) {
+    await NotificationService.notifyUserId(
+      ticket.studentId,
+      `Обращение #${ticket.ticketNumber} закрыто.
+
+Итог: ${label}${ticket.selectedSlot ? `\n\nКонсультация: ${ticket.selectedSlot}` : ""}`,
+    );
+    return;
+  }
+
   await NotificationService.notifyUserId(
     ticket.studentId,
-    `Обращение #${ticket.ticketNumber} закрыто.
-
-Итог: ${label}
-${ticket.teacherResponse ? `\nОтвет:\n${ticket.teacherResponse}` : ""}
-${ticket.selectedSlot ? `\nКонсультация: ${ticket.selectedSlot}` : ""}`,
+    buildClosedTicketFeedbackPrompt(ticket),
     getFeedbackKeyboard(ticket.id),
   );
 }

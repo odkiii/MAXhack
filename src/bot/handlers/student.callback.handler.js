@@ -17,7 +17,10 @@ import {
   getSlotSelectionKeyboard,
   getSimilarDecisionKeyboard,
   getRecommendedTeachersKeyboard,
+  getCategoryKeyboard,
 } from "@/bot/keyboards/ticket.keyboard";
+import { getCategoryLabel, isValidTicketCategory } from "@/bot/constants/ticket-categories";
+import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
 import {
   PII_WARNING,
   DELETE_DATA_PREVIEW,
@@ -53,6 +56,7 @@ function buildTicketSummary(payload) {
 
   return `Проверьте обращение:
 
+Категория: ${getCategoryLabel(payload.category)}
 Преподаватель: ${teacherName}
 Текст: ${payload.description ?? "—"}
 
@@ -76,11 +80,11 @@ async function proceedAfterTeacherSelect(ctx, payload, teacherId, teacherMeta = 
   };
 
   if (nextPayload.description) {
-    await StateService.set(ctx.user.id, FSM_STATES.WAITING_CONFIRMATION, nextPayload);
+    await StateService.set(ctx.user.id, FSM_STATES.WAITING_CATEGORY, nextPayload);
     await respondFromCallback(
       ctx,
-      buildTicketSummary(nextPayload),
-      getConfirmationKeyboard(),
+      "Выберите категорию обращения:",
+      getCategoryKeyboard(),
     );
     return;
   }
@@ -347,6 +351,31 @@ export async function handleStudentCallback(ctx, data) {
     return true;
   }
 
+  if (data.startsWith("cat_")) {
+    const category = data.replace("cat_", "");
+
+    if (!isValidTicketCategory(category)) {
+      return false;
+    }
+
+    const { state, payload } = await StateService.get(user.id);
+
+    if (state !== FSM_STATES.WAITING_CATEGORY) {
+      await respondFromCallback(ctx, "Сначала завершите предыдущий шаг.");
+      return true;
+    }
+
+    const nextPayload = { ...payload, category };
+
+    await StateService.set(user.id, FSM_STATES.WAITING_CONFIRMATION, nextPayload);
+    await respondFromCallback(
+      ctx,
+      buildTicketSummary(nextPayload),
+      getConfirmationKeyboard(),
+    );
+    return true;
+  }
+
   if (data === "confirm_ticket") {
     const { state, payload } = await StateService.get(user.id);
 
@@ -377,7 +406,7 @@ export async function handleStudentCallback(ctx, data) {
       }
     }
 
-    if (!payload.teacherId || !payload.description) {
+    if (!payload.teacherId || !payload.description || !payload.category) {
       await respondFromCallback(
         ctx,
         "Не хватает данных. Начните заново: /start",
@@ -390,6 +419,7 @@ export async function handleStudentCallback(ctx, data) {
       studentId: user.id,
       teacherId: payload.teacherId,
       description: payload.description,
+      category: payload.category,
     });
 
     await StateService.set(user.id, FSM_STATES.WAITING_CONFIRMATION, {
@@ -407,6 +437,7 @@ export async function handleStudentCallback(ctx, data) {
       ctx,
       `Обращение #${ticket.ticketNumber} создано.
 
+Категория: ${getCategoryLabel(ticket.category)}
 Преподаватель: ${teacherName}
 Статус: ${STATUS_LABELS[ticket.status]}`,
       getAfterCreateKeyboard(ticket.id),
@@ -415,6 +446,7 @@ export async function handleStudentCallback(ctx, data) {
     await NotificationService.notifyUserId(
       ticket.teacherId,
       `Новое обращение #${ticket.ticketNumber}
+Категория: ${getCategoryLabel(ticket.category)}
 ${ticket.description}`,
       {
         inline_keyboard: [
@@ -473,9 +505,8 @@ ${ticket.description}`,
     }
 
     if (ticket.clarificationComment) {
-      prompt += types
-        ? `\n\n${ticket.clarificationComment}`
-        : ticket.clarificationComment;
+      prompt += types ? "\n\n" : "";
+      prompt += `Комментарий преподавателя:\n${ticket.clarificationComment}`;
     }
 
     await respondFromCallback(ctx, prompt);
@@ -569,7 +600,7 @@ ${ticket.description}`,
   if (data.startsWith("fb_yes_") || data.startsWith("fb_no_")) {
     const helpful = data.startsWith("fb_yes_");
     const ticketId = data.replace(helpful ? "fb_yes_" : "fb_no_", "");
-    const ticket = await TicketService.setFeedback(
+    const ticket = await TicketService.submitAnswerFeedback(
       ticketId,
       user.id,
       helpful ? "HELPFUL" : "NOT_HELPFUL",
@@ -580,10 +611,21 @@ ${ticket.description}`,
       return true;
     }
 
+    const label = helpful ? "полезным" : "не полезным";
+
     await respondFromCallback(
       ctx,
-      "Спасибо за оценку. Она учитывается только как метрика качества.",
+      `Спасибо! Обращение #${ticket.ticketNumber} закрыто. Ответ отмечен как ${label}. Оценка учитывается только как метрика качества.`,
+      getStudentTicketActionsKeyboard(ticket),
     );
+
+    if (ticket.teacherId) {
+      await NotificationService.notifyUserId(
+        ticket.teacherId,
+        `Студент оценил ответ по обращению #${ticket.ticketNumber}: ${helpful ? "полезно" : "не полезно"}.`,
+      );
+    }
+
     return true;
   }
 

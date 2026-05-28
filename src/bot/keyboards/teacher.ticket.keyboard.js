@@ -4,7 +4,33 @@ import {
   CLARIFICATION_SELECTABLE_TYPES,
 } from "@/bot/constants/clarifications";
 
-export function getTeacherTicketActionsKeyboard(ticketId, status) {
+export function hasClarificationBeenRequested(ticket) {
+  if (!ticket) {
+    return false;
+  }
+
+  if (ticket.status === "AWAITING_CLARIFICATION") {
+    return true;
+  }
+
+  if ((ticket.clarificationTypes?.length ?? 0) > 0) {
+    return true;
+  }
+
+  if (ticket.clarificationComment) {
+    return true;
+  }
+
+  if (ticket.clarificationAnswer) {
+    return true;
+  }
+
+  return false;
+}
+
+export function getTeacherTicketActionsKeyboard(ticket) {
+  const ticketId = typeof ticket === "string" ? ticket : ticket.id;
+  const status = typeof ticket === "string" ? null : ticket.status;
   const rows = [];
 
   if (status === "NEW") {
@@ -20,9 +46,11 @@ export function getTeacherTicketActionsKeyboard(ticketId, status) {
   }
 
   if (["NEW", "IN_PROGRESS", "SCHEDULED"].includes(status)) {
-    rows.push([
-      { text: "Запросить уточнение", callback_data: `t_clarify_${ticketId}` },
-    ]);
+    if (!hasClarificationBeenRequested(ticket)) {
+      rows.push([
+        { text: "Запросить уточнение", callback_data: `t_clarify_${ticketId}` },
+      ]);
+    }
     rows.push([
       { text: "Ответить", callback_data: `t_reply_${ticketId}` },
     ]);

@@ -5,8 +5,8 @@ import { getTeacherByMaxUserId, TEACHERS } from "@/bot/constants/categories";
 
 export class TicketService {
   static async create(data) {
-    const { studentId, teacherId, description } = data;
-    const category = "OTHER";
+    const { studentId, teacherId, description, category = "OTHER" } = data;
+
     const ticket = await prisma.ticket.create({
       data: {
         studentId,
@@ -362,6 +362,67 @@ export class TicketService {
     await TicketEventService.log(ticketId, "CLOSED", actorId, {
       outcome,
       reason,
+    });
+
+    return ticket;
+  }
+
+  static async getFeedbackStatsForTeacher(teacherId) {
+    const [helpful, notHelpful] = await Promise.all([
+      prisma.ticket.count({
+        where: { teacherId, feedback: "HELPFUL" },
+      }),
+      prisma.ticket.count({
+        where: { teacherId, feedback: "NOT_HELPFUL" },
+      }),
+    ]);
+
+    return { helpful, notHelpful, total: helpful + notHelpful };
+  }
+
+  static async submitAnswerFeedback(ticketId, studentId, feedback) {
+    const existing = await prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        studentId,
+        feedback: null,
+      },
+    });
+
+    if (!existing?.teacherResponse) {
+      return null;
+    }
+
+    const wasClosed = existing.status === TICKET_STATUSES.CLOSED;
+    const closeReason =
+      feedback === "HELPFUL"
+        ? "Закрыто после оценки: ответ полезен"
+        : "Закрыто после оценки: ответ не полезен";
+
+    const ticket = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        feedback,
+        ...(wasClosed
+          ? {}
+          : {
+              status: TICKET_STATUSES.CLOSED,
+              closeOutcome: "RESOLVED",
+              closeReason,
+            }),
+      },
+      include: { teacher: true },
+    });
+
+    if (!wasClosed) {
+      await TicketEventService.log(ticketId, "CLOSED", studentId, {
+        outcome: "RESOLVED",
+        reason: closeReason,
+      });
+    }
+
+    await TicketEventService.log(ticketId, "FEEDBACK_LEFT", studentId, {
+      feedback,
     });
 
     return ticket;

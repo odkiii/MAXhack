@@ -15,6 +15,7 @@ export function getTeacherMenuKeyboard(user) {
     [messageButton(MENU_TEXT.ACTIVE)],
     [messageButton(MENU_TEXT.CLOSED)],
     [messageButton(MENU_TEXT.DIAG)],
+    [messageButton(MENU_TEXT.METRICS)],
     [messageButton(MENU_TEXT.HELP)],
     [messageButton(MENU_TEXT.START)],
   ];

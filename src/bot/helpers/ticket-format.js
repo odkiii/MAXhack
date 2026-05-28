@@ -3,6 +3,7 @@ import {
   CLOSE_OUTCOME_LABELS,
 } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
+import { getCategoryLabel } from "@/bot/constants/ticket-categories";
 
 function truncateText(text, maxLength = 200) {
   const line = String(text ?? "").trim();
@@ -36,6 +37,7 @@ export function formatTicketCard(ticket, { full = false } = {}) {
 
   let card = `#${ticket.ticketNumber}
 Статус: ${status}
+Категория: ${getCategoryLabel(ticket.category)}
 Создан: ${created}
 Текст: ${text}`;
 
@@ -46,7 +48,7 @@ export function formatTicketCard(ticket, { full = false } = {}) {
         .join(", ");
       card += `\n\nЗапрошено уточнение: ${types}`;
       if (ticket.clarificationComment) {
-        card += `\nКомментарий: ${ticket.clarificationComment}`;
+        card += `\nКомментарий преподавателя: ${ticket.clarificationComment}`;
       }
     }
 
