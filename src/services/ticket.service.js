@@ -249,6 +249,7 @@ export class TicketService {
         clarificationTypes,
         clarificationComment: comment ?? null,
         clarificationAnswer: null,
+        clarificationAttachment: null,
       },
       include: { student: true, teacher: true },
     });
@@ -263,12 +264,25 @@ export class TicketService {
     return ticket;
   }
 
-  static async answerClarification(ticketId, studentId, answer) {
+  static async answerClarification(ticketId, studentId, answer, attachment = null) {
+    const owned = await prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        studentId,
+        status: TICKET_STATUSES.AWAITING_CLARIFICATION,
+      },
+    });
+
+    if (!owned) {
+      return null;
+    }
+
     const ticket = await prisma.ticket.update({
       where: { id: ticketId },
       data: {
         status: TICKET_STATUSES.IN_PROGRESS,
-        clarificationAnswer: answer,
+        clarificationAnswer: answer ?? null,
+        clarificationAttachment: attachment ?? null,
       },
       include: { student: true, teacher: true },
     });
@@ -277,7 +291,7 @@ export class TicketService {
       ticketId,
       "CLARIFICATION_ANSWERED",
       studentId,
-      { answer },
+      { answer, attachment },
     );
 
     return ticket;

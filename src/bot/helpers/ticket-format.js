@@ -4,6 +4,7 @@ import {
 } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
 import { getCategoryLabel } from "@/bot/constants/ticket-categories";
+import { formatStoredAttachmentLabel } from "@/lib/max-media";
 
 function truncateText(text, maxLength = 200) {
   const line = String(text ?? "").trim();
@@ -52,8 +53,20 @@ export function formatTicketCard(ticket, { full = false } = {}) {
       }
     }
 
-    if (ticket.clarificationAnswer) {
-      card += `\n\nОтвет студента:\n${ticket.clarificationAnswer}`;
+    if (ticket.clarificationAnswer || ticket.clarificationAttachment) {
+      if (ticket.clarificationAnswer) {
+        card += `\n\nОтвет студента:\n${ticket.clarificationAnswer}`;
+      }
+
+      const attachmentLabel = formatStoredAttachmentLabel(
+        ticket.clarificationAttachment,
+      );
+
+      if (attachmentLabel) {
+        card += ticket.clarificationAnswer
+          ? `\n${attachmentLabel}`
+          : `\n\nОтвет студента:\n${attachmentLabel}`;
+      }
     }
 
     if (ticket.teacherResponse) {

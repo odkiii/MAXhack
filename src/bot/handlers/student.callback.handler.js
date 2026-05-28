@@ -27,7 +27,6 @@ import {
   SERVICE_INTRO,
   TEACHER_VERIFICATION_TEXT,
 } from "@/bot/texts/legal";
-import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
 import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { showTeacherSelectionPage } from "@/bot/helpers/teacher-selection.helper";
@@ -36,7 +35,7 @@ import {
   formatTicketListLabel,
 } from "@/bot/helpers/ticket-format";
 import { formatStatus } from "@/bot/constants/statuses";
-import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
+import { CLARIFICATION_LABELS, CLARIFICATION_TYPES } from "@/bot/constants/clarifications";
 import { getConsentKeyboard } from "@/bot/keyboards/consent.keyboard";
 import {
   getTeacherVerificationRequestKeyboard,
@@ -62,7 +61,7 @@ function buildTicketSummary(payload) {
 
 ${PII_WARNING}
 
-Подтвердите отправку или отмените.`;
+Подтвердите отправку или нажмите «Назад».`;
 }
 
 async function proceedAfterTeacherSelect(ctx, payload, teacherId, teacherMeta = {}) {
@@ -180,7 +179,6 @@ export async function handleStudentCallback(ctx, data) {
     await respondFromCallback(
       ctx,
       "Отлично, рад что помогло. Новый тикет не создавался.",
-      getBackToMenuKeyboard(user),
     );
     return true;
   }
@@ -297,7 +295,6 @@ export async function handleStudentCallback(ctx, data) {
       await respondFromCallback(
         ctx,
         "У вас пока нет обращений.",
-        getBackToMenuKeyboard(user),
       );
       return true;
     }
@@ -311,15 +308,12 @@ export async function handleStudentCallback(ctx, data) {
       ctx,
       `Ваши обращения:\n\n${lines}`,
       {
-        inline_keyboard: [
-          ...tickets.slice(0, 8).map((t) => [
-            {
-              text: `#${t.ticketNumber} · ${formatStatus(t.status)}`,
-              callback_data: `st_view_${t.id}`,
-            },
-          ]),
-          ...getBackToMenuKeyboard(user).inline_keyboard,
-        ],
+        inline_keyboard: tickets.slice(0, 8).map((t) => [
+          {
+            text: `#${t.ticketNumber} · ${formatStatus(t.status)}`,
+            callback_data: `st_view_${t.id}`,
+          },
+        ]),
       },
     );
     return true;
@@ -458,12 +452,6 @@ ${ticket.description}`,
     return true;
   }
 
-  if (data === "cancel_ticket") {
-    await StateService.clear(user.id);
-    await showMainMenu(ctx);
-    return true;
-  }
-
   if (data.startsWith("st_view_")) {
     const ticketId = data.replace("st_view_", "");
     const ticket = await TicketService.findByIdForStudent(ticketId, user.id);
@@ -498,14 +486,26 @@ ${ticket.description}`,
       ticketId,
     });
 
-    let prompt = "Ответьте на уточнение одним сообщением.\n\n";
+    const needsScreenshot = (ticket.clarificationTypes ?? []).includes(
+      CLARIFICATION_TYPES.ERROR_SCREENSHOT,
+    );
+
+    let prompt = needsScreenshot
+      ? "Ответьте на уточнение.\n\n"
+      : "Ответьте на уточнение одним сообщением.\n\n";
 
     if (types) {
       prompt += `Нужно:\n• ${types}`;
     }
 
-    if (ticket.clarificationComment) {
+    if (needsScreenshot) {
       prompt += types ? "\n\n" : "";
+      prompt +=
+        "Для скриншота отправьте одно фото или файл из галереи (можно с подписью).";
+    }
+
+    if (ticket.clarificationComment) {
+      prompt += types || needsScreenshot ? "\n\n" : "";
       prompt += `Комментарий преподавателя:\n${ticket.clarificationComment}`;
     }
 

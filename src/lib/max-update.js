@@ -1,4 +1,5 @@
 import { fromMaxAttachments } from "@/lib/max-keyboard";
+import { extractMediaAttachments } from "@/lib/max-media";
 
 function mapMaxUser(user) {
   if (!user || user.user_id == null) {
@@ -127,6 +128,7 @@ function normalizeMessageCreated(raw) {
     message: {
       text,
       from,
+      attachments: extractMediaAttachments(message),
       chat: { id: recipient.chatId ?? recipient.userId },
       _maxRecipient: recipient,
     },

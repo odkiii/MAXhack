@@ -15,7 +15,6 @@ export function getStudentMenuKeyboard(user) {
     [messageButton(MENU_TEXT.MY_TICKETS)],
     [messageButton(MENU_TEXT.HELP)],
     [messageButton(MENU_TEXT.DELETE_DATA)],
-    [messageButton(MENU_TEXT.START)],
   ];
 
   if (isAdmin(user)) {
@@ -42,12 +41,6 @@ export function getStartMenuKeyboard() {
   };
 }
 
-export function getBackToMenuKeyboard(user = null) {
-  if (user) {
-    return getStudentMenuKeyboard(user);
-  }
-
-  return {
-    inline_keyboard: [[messageButton(MENU_TEXT.START)]],
-  };
+export function getBackToMenuKeyboard() {
+  return null;
 }

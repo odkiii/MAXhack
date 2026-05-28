@@ -1,38 +1,14 @@
 import { MaxService } from "@/services/max.service";
 import { NavigationService } from "@/services/navigation.service";
 import { NAV_CALLBACKS, NAV_LABELS } from "@/bot/constants/navigation";
-import { MENU_TEXT } from "@/bot/constants/menu-text";
 
-const NAV_BUTTON_TEXTS = new Set([
-  NAV_LABELS.BACK,
-  NAV_LABELS.MAIN_MENU,
-  MENU_TEXT.START,
-  "В главное меню",
-  "В меню преподавателя",
-]);
-
-function isNavigationButton(button) {
-  if (!button) {
-    return false;
-  }
-
-  if (
-    button.callback_data === NAV_CALLBACKS.BACK ||
-    button.callback_data === NAV_CALLBACKS.MAIN_MENU ||
-    button.callback_data === "main_menu"
-  ) {
-    return true;
-  }
-
-  if (button.type === "message" && NAV_BUTTON_TEXTS.has(button.text)) {
-    return true;
-  }
-
-  return NAV_BUTTON_TEXTS.has(button.text);
-}
-
-function isNavigationRow(row) {
-  return row.length > 0 && row.every(isNavigationButton);
+function isNavCallbackRow(row) {
+  return row.some(
+    (button) =>
+      button.callback_data === NAV_CALLBACKS.BACK ||
+      button.callback_data === NAV_CALLBACKS.MAIN_MENU ||
+      button.callback_data === "main_menu",
+  );
 }
 
 export function stripNavigationRows(keyboard) {
@@ -41,7 +17,7 @@ export function stripNavigationRows(keyboard) {
   }
 
   const inline_keyboard = keyboard.inline_keyboard.filter(
-    (row) => !isNavigationRow(row),
+    (row) => !isNavCallbackRow(row),
   );
 
   if (!inline_keyboard.length) {
@@ -154,8 +130,8 @@ export async function handleNavigationBack(ctx) {
   const frame = await NavigationService.pop(ctx.user.id);
 
   if (!frame) {
-    const { showMainMenu } = await import("@/bot/helpers/menu.helper");
-    await showMainMenu(ctx);
+    const { deliverMainMenu } = await import("@/bot/helpers/menu.helper");
+    await deliverMainMenu(ctx);
     return;
   }
 

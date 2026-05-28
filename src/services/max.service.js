@@ -1,5 +1,5 @@
 import { sendMessage, answerCallback, deleteMessage as deleteMessageApi } from "@/lib/max-api";
-import { toMaxAttachments } from "@/lib/max-keyboard";
+import { mergeMaxAttachments, toMaxAttachments } from "@/lib/max-keyboard";
 
 export class MaxService {
   static getCallbackMessageId(callbackQuery) {
@@ -35,9 +35,12 @@ export class MaxService {
     return result;
   }
 
-  static async sendMessage(target, text, keyboard = null) {
+  static async sendMessage(target, text, keyboard = null, mediaAttachments = null) {
     const recipient = resolveRecipient(target);
-    const attachments = toMaxAttachments(keyboard);
+    const attachments = mergeMaxAttachments(
+      keyboard,
+      Array.isArray(mediaAttachments) ? mediaAttachments : [],
+    );
 
     if (!process.env.MAX_BOT_TOKEN) {
       console.log("[MAX API mock]", { recipient, textPreview: text?.slice(0, 60) });

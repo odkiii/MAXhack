@@ -15,8 +15,6 @@ export function getTeacherSelectionPageKeyboard(teachers, page, totalPages) {
     rows.push(buildPaginationRow(page, totalPages));
   }
 
-  rows.push([{ text: "Отмена", callback_data: "main_menu" }]);
-
   return { inline_keyboard: rows };
 }
 

@@ -7,6 +7,7 @@ import { HELP_TEXT } from "@/bot/texts/help";
 import { NavigationService } from "@/services/navigation.service";
 import {
   respondFromCallback,
+  sendBotMessage,
   NAV_HOME,
 } from "@/bot/helpers/navigation.helper";
 
@@ -33,6 +34,23 @@ export function resolveMenuRole(user) {
   return ROLES.STUDENT;
 }
 
+export function getMainMenuPayload(user) {
+  const role = resolveMenuRole(user);
+  const name = user.displayName ?? "пользователь";
+
+  if (role === ROLES.TEACHER) {
+    return {
+      text: `Меню преподавателя. Здравствуйте, ${name}!`,
+      keyboard: getTeacherMenuKeyboard(user),
+    };
+  }
+
+  return {
+    text: `Главное меню. Здравствуйте, ${name}!`,
+    keyboard: getStudentMenuKeyboard(user),
+  };
+}
+
 export function getMenuKeyboardForUser(ctx) {
   const role = resolveMenuRole(ctx.user);
 
@@ -43,45 +61,28 @@ export function getMenuKeyboardForUser(ctx) {
   return getStudentMenuKeyboard(ctx.user);
 }
 
-export async function showMainMenu(ctx) {
+export async function deliverMainMenu(ctx) {
   await NavigationService.clear(ctx.user.id);
-  const role = resolveMenuRole(ctx.user);
-  const name = ctx.user.displayName ?? "пользователь";
+  const { text, keyboard } = getMainMenuPayload(ctx.user);
 
-  if (role === ROLES.TEACHER) {
-    await respondFromCallback(
-      ctx,
-      `Меню преподавателя. Здравствуйте, ${name}!`,
-      getTeacherMenuKeyboard(ctx.user),
-      NAV_HOME,
-    );
+  if (ctx.callbackQuery) {
+    await respondFromCallback(ctx, text, keyboard, NAV_HOME);
     return;
   }
 
-  await respondFromCallback(
-    ctx,
-    `Главное меню. Здравствуйте, ${name}!`,
-    getStudentMenuKeyboard(ctx.user),
-    NAV_HOME,
-  );
+  await sendBotMessage(ctx, text, keyboard, NAV_HOME);
+}
+
+export async function showMainMenu(ctx) {
+  await deliverMainMenu(ctx);
 }
 
 export async function showHelp(ctx) {
-  await respondFromCallback(ctx, HELP_TEXT, getMenuKeyboardForUser(ctx));
+  await respondFromCallback(ctx, HELP_TEXT, null);
 }
 
 export async function sendMainMenuMessage(recipient, user) {
   await NavigationService.clear(user.id);
-  const role = resolveMenuRole(user);
-  const name = user.displayName ?? "пользователь";
-  const keyboard =
-    role === ROLES.TEACHER
-      ? getTeacherMenuKeyboard(user)
-      : getStudentMenuKeyboard(user);
-  const text =
-    role === ROLES.TEACHER
-      ? `Меню преподавателя. Здравствуйте, ${name}!`
-      : `Главное меню. Здравствуйте, ${name}!`;
-
+  const { text, keyboard } = getMainMenuPayload(user);
   await MaxService.sendMessage(recipient, text, keyboard);
 }

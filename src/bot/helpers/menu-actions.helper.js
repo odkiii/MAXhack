@@ -1,12 +1,17 @@
-import { resolveMenuRole } from "@/bot/helpers/menu.helper";
+import { resolveMenuRole, deliverMainMenu } from "@/bot/helpers/menu.helper";
 import { ROLES } from "@/bot/constants/roles";
 import { handleStudentCallback } from "@/bot/handlers/student.callback.handler";
 import { handleTeacherCallback } from "@/bot/handlers/teacher.callback.handler";
 import { startHandler } from "@/bot/handlers/start.handler";
 
 export async function dispatchMenuTextAction(ctx, action) {
-  if (action === "start") {
-    await startHandler(ctx);
+  if (action === "start" || action === "main_menu") {
+    if (action === "start") {
+      await startHandler(ctx);
+      return true;
+    }
+
+    await deliverMainMenu(ctx);
     return true;
   }
 

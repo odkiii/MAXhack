@@ -14,24 +14,20 @@ import {
   showAdminTeacherMetricsPage,
   showAdminTeacherMetricsDetail,
 } from "@/bot/helpers/metrics.helper";
-import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { NAV_CALLBACKS } from "@/bot/constants/navigation";
 
 function buildPendingTeachersKeyboard(pending) {
   return {
-    inline_keyboard: [
-      ...pending.map((user) => [
-        {
-          text: `${ADMIN_ACTION_BUTTONS.VERIFY}: ${user.displayName ?? user.maxUserId}`,
-          callback_data: `admin_verify_${user.id}`,
-        },
-        {
-          text: ADMIN_ACTION_BUTTONS.REJECT,
-          callback_data: `admin_reject_${user.id}`,
-        },
-      ]),
-      [{ text: "В главное меню", callback_data: "main_menu" }],
-    ],
+    inline_keyboard: pending.map((user) => [
+      {
+        text: `${ADMIN_ACTION_BUTTONS.VERIFY}: ${user.displayName ?? user.maxUserId}`,
+        callback_data: `admin_verify_${user.id}`,
+      },
+      {
+        text: ADMIN_ACTION_BUTTONS.REJECT,
+        callback_data: `admin_reject_${user.id}`,
+      },
+    ]),
   };
 }
 
@@ -42,7 +38,6 @@ async function showPendingTeachers(ctx) {
     await respondFromCallback(
       ctx,
       "Нет ожидающих запросов на подтверждение преподавателей.",
-      getBackToMenuKeyboard(ctx.user),
     );
     return;
   }
@@ -124,7 +119,6 @@ export async function callbackHandler(ctx) {
       await respondFromCallback(
         ctx,
         `Подтверждено: ${approved.displayName ?? approved.maxUserId}.\n\nБольше нет ожидающих запросов.`,
-        getBackToMenuKeyboard(ctx.user),
       );
       return;
     }
@@ -159,7 +153,6 @@ export async function callbackHandler(ctx) {
       await respondFromCallback(
         ctx,
         `Отклонено: ${rejected.displayName ?? rejected.maxUserId}.\n\nБольше нет ожидающих запросов.`,
-        getBackToMenuKeyboard(ctx.user),
       );
       return;
     }

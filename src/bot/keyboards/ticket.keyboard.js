@@ -7,7 +7,6 @@ import {
 export function getConfirmationKeyboard() {  return {
     inline_keyboard: [
       [{ text: "Подтвердить отправку", callback_data: "confirm_ticket" }],
-      [{ text: "Отмена", callback_data: "cancel_ticket" }],
     ],
   };
 }
@@ -47,7 +46,6 @@ export function getAfterCreateKeyboard(ticketId) {
   return {
     inline_keyboard: [
       [{ text: "Смотреть статус", callback_data: `st_view_${ticketId}` }],
-      [{ text: "В главное меню", callback_data: "main_menu" }],
     ],
   };
 }
@@ -80,8 +78,6 @@ export function getStudentTicketActionsKeyboard(ticket) {
     ]);
   }
 
-  rows.push([{ text: "В главное меню", callback_data: "main_menu" }]);
-
   return { inline_keyboard: rows };
 }
 
@@ -89,18 +85,14 @@ export function getDeleteConfirmKeyboard() {
   return {
     inline_keyboard: [
       [{ text: "Подтвердить удаление", callback_data: "delete_confirm" }],
-      [{ text: "Отмена", callback_data: "main_menu" }],
     ],
   };
 }
 
 export function getSlotSelectionKeyboard(ticketId, slots) {
   return {
-    inline_keyboard: [
-      ...slots.map((slot, i) => [
-        { text: slot, callback_data: `st_slot_${ticketId}_${i}` },
-      ]),
-      [{ text: "Отмена", callback_data: "main_menu" }],
-    ],
+    inline_keyboard: slots.map((slot, i) => [
+      { text: slot, callback_data: `st_slot_${ticketId}_${i}` },
+    ]),
   };
 }

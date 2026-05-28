@@ -18,7 +18,7 @@ function formatNotificationText(text) {
 }
 
 export class NotificationService {
-  static async notifyMaxUser(maxUserId, text, keyboard = null) {
+  static async notifyMaxUser(maxUserId, text, keyboard = null, mediaAttachments = null) {
     if (!maxUserId) {
       return null;
     }
@@ -31,16 +31,17 @@ export class NotificationService {
       },
       formatNotificationText(text),
       keyboard,
+      mediaAttachments,
     );
   }
 
-  static async notifyUserId(userId, text, keyboard = null) {
+  static async notifyUserId(userId, text, keyboard = null, mediaAttachments = null) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       return null;
     }
 
-    return this.notifyMaxUser(user.maxUserId, text, keyboard);
+    return this.notifyMaxUser(user.maxUserId, text, keyboard, mediaAttachments);
   }
 }

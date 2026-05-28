@@ -39,8 +39,9 @@ export async function botRouter(update) {
     const recipient = getRecipientFromMessage(message);
     const chatId = recipient.userId ?? recipient.chatId;
     const text = message.text ?? "";
+    const attachments = message.attachments ?? [];
 
-    const ctx = { user, chatId, recipient, text, message, update };
+    const ctx = { user, chatId, recipient, text, attachments, message, update };
 
     if (isStartCommand(text) || update.update_type === "bot_started") {
       await startHandler(ctx);

@@ -2,7 +2,7 @@ import { MaxService } from "@/services/max.service";
 import { UserService } from "@/services/user.service";
 import { isConfiguredTeacher } from "@/bot/constants/categories";
 import { getRoleSelectionKeyboard, getPendingTeacherVerificationKeyboard } from "@/bot/keyboards/role.keyboard";
-import { sendMainMenuMessage } from "@/bot/helpers/menu.helper";
+import { deliverMainMenu } from "@/bot/helpers/menu.helper";
 import {
   respondFromCallback,
   sendBotMessage,
@@ -75,7 +75,7 @@ export async function routeUserAfterAuth(ctx) {
     return;
   }
 
-  await sendMainMenuMessage(ctx.recipient, user);
+  await deliverMainMenu({ ...ctx, user });
 }
 
 export async function sendUserAfterAuth(ctx) {
@@ -105,5 +105,5 @@ export async function sendUserAfterAuth(ctx) {
     return;
   }
 
-  await sendMainMenuMessage(ctx.recipient, user);
+  await deliverMainMenu({ ...ctx, user });
 }

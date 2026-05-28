@@ -59,8 +59,6 @@ export function getTeacherTicketActionsKeyboard(ticket) {
     ]);
   }
 
-  rows.push([{ text: "Назад", callback_data: "t_queue" }]);
-
   return { inline_keyboard: rows };
 }
 
@@ -77,7 +75,6 @@ export function getClarificationTypesKeyboard(ticketId, selected = []) {
         ];
       }),
       [{ text: "Другое (написать)", callback_data: `t_clt_done_${ticketId}` }],
-      [{ text: "Отмена", callback_data: `t_view_${ticketId}` }],
     ],
   };
 }
@@ -94,21 +91,17 @@ export function getCloseOutcomeKeyboard(ticketId) {
           callback_data: `t_co_${ticketId}_CONSULTATION_SCHEDULED`,
         },
       ],
-      [{ text: "Отмена", callback_data: `t_view_${ticketId}` }],
     ],
   };
 }
 
 export function getTicketListKeyboard(tickets, prefix) {
   return {
-    inline_keyboard: [
-      ...tickets.slice(0, 10).map((t) => [
-        {
-          text: `#${t.ticketNumber} · ${formatTicketListLabel(t)}`,
-          callback_data: `${prefix}_${t.id}`,
-        },
-      ]),
-      [{ text: "В меню преподавателя", callback_data: "main_menu" }],
-    ],
+    inline_keyboard: tickets.slice(0, 10).map((t) => [
+      {
+        text: `#${t.ticketNumber} · ${formatTicketListLabel(t)}`,
+        callback_data: `${prefix}_${t.id}`,
+      },
+    ]),
   };
 }

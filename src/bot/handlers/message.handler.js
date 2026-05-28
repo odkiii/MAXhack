@@ -2,21 +2,22 @@ import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
-import { TICKET_STATUSES, formatStatus } from "@/bot/constants/statuses";
+import { TICKET_STATUSES, CLOSE_OUTCOMES, formatStatus } from "@/bot/constants/statuses";
 import {
   getSimilarDecisionKeyboard,
   getCategoryKeyboard,
 } from "@/bot/keyboards/ticket.keyboard";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
-import { showMainMenu, resolveMenuRole, sendMainMenuMessage } from "@/bot/helpers/menu.helper";
+import { showMainMenu, resolveMenuRole, deliverMainMenu } from "@/bot/helpers/menu.helper";
 import { sendBotMessage } from "@/bot/helpers/navigation.helper";
 import { resolveMenuTextAction } from "@/bot/constants/menu-text";
 import { dispatchMenuTextAction } from "@/bot/helpers/menu-actions.helper";
 import { ROLES } from "@/bot/constants/roles";
 import { finalizeClose } from "@/bot/handlers/teacher.callback.handler";
-import { CLOSE_OUTCOMES } from "@/bot/constants/statuses";
 import { getFeedbackKeyboard, buildAnswerFeedbackPrompt } from "@/bot/keyboards/feedback.keyboard";
+import { CLARIFICATION_TYPES } from "@/bot/constants/clarifications";
+import { pickIncomingMedia, toMaxOutgoingAttachment } from "@/lib/max-media";
 
 export async function messageHandler(ctx) {
   const { user, text } = ctx;
@@ -101,39 +102,80 @@ export async function messageHandler(ctx) {
   }
 
   if (state === FSM_STATES.WAITING_CLARIFICATION_REPLY) {
-    const answer = text?.trim();
+    const ticket = await TicketService.findByIdForStudent(payload.ticketId, user.id);
 
-    if (!answer) {
+    if (!ticket || ticket.status !== TICKET_STATUSES.AWAITING_CLARIFICATION) {
+      await StateService.clear(user.id);
+      await sendBotMessage(ctx, "Уточнение по этому обращению больше не ожидается.");
+      return;
+    }
+
+    const needsScreenshot = (ticket.clarificationTypes ?? []).includes(
+      CLARIFICATION_TYPES.ERROR_SCREENSHOT,
+    );
+    const textOnlyTypes = (ticket.clarificationTypes ?? []).filter(
+      (type) => type !== CLARIFICATION_TYPES.ERROR_SCREENSHOT,
+    );
+    const answer = text?.trim() || null;
+    const attachment = pickIncomingMedia(ctx.attachments);
+
+    if (needsScreenshot && !attachment) {
+      await sendBotMessage(
+        ctx,
+        "Пришлите одно фото или файл из галереи (можно с подписью в одном сообщении).",
+      );
+      return;
+    }
+
+    if (!needsScreenshot && !answer) {
       await sendBotMessage(ctx, "Отправьте текстовый ответ.");
       return;
     }
 
-    const ticket = await TicketService.answerClarification(
+    if (textOnlyTypes.length > 0 && !answer) {
+      await sendBotMessage(
+        ctx,
+        "Добавьте текстовый ответ — можно подписью к фото.",
+      );
+      return;
+    }
+
+    const savedTicket = await TicketService.answerClarification(
       payload.ticketId,
       user.id,
       answer,
+      attachment,
     );
 
     await StateService.clear(user.id);
 
-    if (!ticket) {
+    if (!savedTicket) {
       await sendBotMessage(ctx, "Не удалось сохранить ответ.");
       return;
     }
 
     await sendBotMessage(
       ctx,
-      `Ответ отправлен. Обращение #${ticket.ticketNumber} снова в работе.`,
+      `Ответ отправлен. Обращение #${savedTicket.ticketNumber} снова в работе.`,
     );
 
+    const teacherText = answer
+      ? `Студент ответил на уточнение по #${savedTicket.ticketNumber}:\n${answer}`
+      : `Студент прислал скриншот по уточнению #${savedTicket.ticketNumber}.`;
+
+    const outgoingAttachment = attachment
+      ? toMaxOutgoingAttachment(attachment)
+      : null;
+
     await NotificationService.notifyUserId(
-      ticket.teacherId,
-      `Студент ответил на уточнение по #${ticket.ticketNumber}:\n${answer}`,
+      savedTicket.teacherId,
+      teacherText,
       {
         inline_keyboard: [
-          [{ text: "Открыть", callback_data: `t_view_${ticket.id}` }],
+          [{ text: "Открыть", callback_data: `t_view_${savedTicket.id}` }],
         ],
       },
+      outgoingAttachment ? [outgoingAttachment] : null,
     );
     return;
   }
@@ -286,7 +328,7 @@ export async function messageHandler(ctx) {
     return;
   }
 
-  await sendMainMenuMessage(ctx.recipient, ctx.user);
+  await deliverMainMenu(ctx);
 }
 
 function getDaysAgoLabel(dateValue) {

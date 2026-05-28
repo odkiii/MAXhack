@@ -37,6 +37,20 @@ export function toMaxAttachments(keyboard) {
   return attachment ? [attachment] : null;
 }
 
+export function mergeMaxAttachments(keyboard, mediaAttachments = []) {
+  const media = Array.isArray(mediaAttachments)
+    ? mediaAttachments.filter(Boolean)
+    : [];
+  const keyboardAttachment = toMaxInlineKeyboard(keyboard);
+  const attachments = [...media];
+
+  if (keyboardAttachment) {
+    attachments.push(keyboardAttachment);
+  }
+
+  return attachments.length ? attachments : null;
+}
+
 export function fromMaxAttachments(attachments) {
   if (!Array.isArray(attachments)) {
     return null;

@@ -17,7 +17,6 @@ export function getTeacherMenuKeyboard(user) {
     [messageButton(MENU_TEXT.DIAG)],
     [messageButton(MENU_TEXT.METRICS)],
     [messageButton(MENU_TEXT.HELP)],
-    [messageButton(MENU_TEXT.START)],
   ];
 
   if (shouldShowTeacherVerificationButton(user)) {

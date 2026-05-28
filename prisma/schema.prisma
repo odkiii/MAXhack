@@ -121,9 +121,10 @@ model Ticket {
   status       TicketStatus   @default(NEW)
   description  String
 
-  clarificationTypes    ClarificationType[] @default([])
-  clarificationComment  String?
-  clarificationAnswer   String?
+  clarificationTypes       ClarificationType[] @default([])
+  clarificationComment     String?
+  clarificationAnswer      String?
+  clarificationAttachment  Json?
   teacherResponse       String?
   proposedSlots         Json?
   selectedSlot          String?
