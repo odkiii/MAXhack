@@ -25,6 +25,26 @@ export function getConfirmationKeyboard() {
   };
 }
 
+export function getSimilarDecisionKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "Да, помогло", callback_data: "similar_helped" }],
+      [{ text: "Создать тикет", callback_data: "similar_create" }],
+    ],
+  };
+}
+
+export function getRecommendedTeachersKeyboard(teacherKeys) {
+  return {
+    inline_keyboard: [
+      ...teacherKeys.map((key) => [
+        { text: key.displayName, callback_data: `rec_teacher_${key.key}` },
+      ]),
+      [{ text: "Выбрать вручную", callback_data: "manual_teacher_select" }],
+    ],
+  };
+}
+
 export function getAfterCreateKeyboard(ticketId) {
   return {
     inline_keyboard: [

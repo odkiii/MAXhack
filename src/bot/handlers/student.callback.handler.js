@@ -20,11 +20,14 @@ import {
   getStudentTicketActionsKeyboard,
   getDeleteConfirmKeyboard,
   getSlotSelectionKeyboard,
+  getSimilarDecisionKeyboard,
+  getRecommendedTeachersKeyboard,
 } from "@/bot/keyboards/ticket.keyboard";
 import {
   PII_WARNING,
   DELETE_DATA_PREVIEW,
   SERVICE_INTRO,
+  TEACHER_VERIFICATION_TEXT,
 } from "@/bot/texts/legal";
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
@@ -34,6 +37,12 @@ import {
 } from "@/bot/helpers/ticket-format";
 import { STATUS_LABELS } from "@/bot/constants/statuses";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
+import { getConsentKeyboard } from "@/bot/keyboards/consent.keyboard";
+import {
+  getRoleSelectionKeyboard,
+  getTeacherVerificationRequestKeyboard,
+  getAdminTeacherVerificationKeyboard,
+} from "@/bot/keyboards/role.keyboard";
 
 function buildTicketSummary(payload) {
   const teacher = getTeacherByKey(payload.teacherKey);
@@ -56,7 +65,11 @@ export async function handleStudentCallback(ctx, data) {
   if (data === "accept_consent") {
     await ConsentService.accept(user.id);
     await StateService.clear(user.id);
-    await showMainMenu(ctx);
+    await MaxService.sendMessage(
+      recipient,
+      "Выберите роль для работы с ботом:",
+      getRoleSelectionKeyboard(),
+    );
     return true;
   }
 
@@ -71,17 +84,169 @@ export async function handleStudentCallback(ctx, data) {
     return true;
   }
 
+  if (data === "role_student") {
+    await UserService.setRoleStudent(user.id);
+    await showMainMenu({ ...ctx, user: { ...user, role: ROLES.STUDENT } });
+    return true;
+  }
+
+  if (data === "role_teacher") {
+    if (user.teacherVerificationStatus === "APPROVED") {
+      await showMainMenu({
+        ...ctx,
+        user: { ...user, role: ROLES.TEACHER, teacherVerificationStatus: "APPROVED" },
+      });
+      return true;
+    }
+
+    if (user.teacherVerificationStatus === "PENDING") {
+      await MaxService.sendMessage(
+        recipient,
+        "Ваш запрос на подтверждение преподавателя уже отправлен и ожидает решения администратора.",
+        getRoleSelectionKeyboard(),
+      );
+      return true;
+    }
+
+    await MaxService.sendMessage(
+      recipient,
+      TEACHER_VERIFICATION_TEXT,
+      getTeacherVerificationRequestKeyboard(),
+    );
+    return true;
+  }
+
+  if (data === "request_teacher_verification") {
+    const updated = await UserService.requestTeacherVerification(user.id);
+    const adminMaxUserId = process.env.ADMIN_MAX_USER_ID;
+
+    if (adminMaxUserId) {
+      await NotificationService.notifyMaxUser(
+        adminMaxUserId,
+        `Запрос подтверждения преподавателя\n\nПользователь: ${updated.displayName ?? "без имени"}\nMAX ID: ${updated.maxUserId}\nРоль: преподаватель`,
+        getAdminTeacherVerificationKeyboard(updated.id),
+      );
+    }
+
+    await MaxService.sendMessage(
+      recipient,
+      "Запрос отправлен администратору. После подтверждения вы сможете принимать тикеты студентов.",
+      getRoleSelectionKeyboard(),
+    );
+    return true;
+  }
+
   if (data === "help") {
     await showHelp(ctx);
     return true;
   }
 
   if (data === "create_ticket") {
-    await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, {});
+    await StateService.set(user.id, FSM_STATES.WAITING_QUESTION_INPUT, {});
+    await MaxService.sendMessage(
+      recipient,
+      "Опишите вопрос одним сообщением. Я сначала проверю похожие уже решенные обращения.",
+    );
+    return true;
+  }
+
+  if (data === "similar_helped") {
+    await StateService.clear(user.id);
+    await MaxService.updateCallbackMessage(
+      ctx.callbackQuery,
+      "Вопрос закрыт без создания тикета.",
+      getBackToMenuKeyboard(),
+    );
+    await MaxService.sendMessage(
+      recipient,
+      "Отлично, рад что помогло. Новый тикет не создавался.",
+      getBackToMenuKeyboard(),
+    );
+    return true;
+  }
+
+  if (data === "similar_create") {
+    const { state, payload } = await StateService.get(user.id);
+    const draftQuestion = payload.draftQuestion ?? "";
+
+    if (state !== FSM_STATES.WAITING_SIMILAR_DECISION || !draftQuestion) {
+      await MaxService.sendMessage(recipient, "Сначала отправьте вопрос.");
+      return true;
+    }
+
+    await MaxService.updateCallbackMessage(
+      ctx.callbackQuery,
+      "Переходим к созданию тикета…",
+    );
+
+    const recommended = await TicketService.recommendTeachersByQuestion(draftQuestion, 3);
+
+    if (recommended.length === 0) {
+      await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, { draftQuestion });
+      await MaxService.sendMessage(
+        recipient,
+        "Похожих решенных вопросов не найдено. Выберите преподавателя:",
+        getTeacherSelectionKeyboard(),
+      );
+      return true;
+    }
+
+    const recommendationText = recommended
+      .map(
+        (r, i) =>
+          `[${i + 1}] ${r.teacher.displayName} - ${r.teacher.expertise ?? "общая консультация"}\nзакрыл ${r.closedSimilarCount} похожих тикетов`,
+      )
+      .join("\n\n");
+
+    await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, {
+      draftQuestion,
+      recommendedTeacherKeys: recommended.map((r) => r.teacher.key),
+    });
+
+    await MaxService.sendMessage(
+      recipient,
+      `По теме вашего вопроса подойдут:\n\n${recommendationText}`,
+      getRecommendedTeachersKeyboard(recommended.map((r) => r.teacher)),
+    );
+    return true;
+  }
+
+  if (data === "manual_teacher_select") {
+    const { payload } = await StateService.get(user.id);
+    await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, payload ?? {});
     await MaxService.sendMessage(
       recipient,
       "Выберите преподавателя из справочника:",
       getTeacherSelectionKeyboard(),
+    );
+    return true;
+  }
+
+  if (data.startsWith("rec_teacher_")) {
+    const key = data.replace("rec_teacher_", "");
+    const teacherData = getTeacherByKey(key);
+
+    if (!teacherData) {
+      await MaxService.sendMessage(recipient, "Преподаватель не найден.");
+      return true;
+    }
+
+    const teacher = await UserService.findOrCreate(
+      { id: teacherData.maxUserId, first_name: teacherData.displayName },
+      ROLES.TEACHER,
+    );
+    const { payload } = await StateService.get(user.id);
+
+    await StateService.set(user.id, FSM_STATES.WAITING_CATEGORY, {
+      ...payload,
+      teacherKey: teacherData.key,
+      teacherId: teacher.id,
+    });
+
+    await MaxService.sendMessage(
+      recipient,
+      "Выберите категорию обращения:",
+      getCategoriesKeyboard(),
     );
     return true;
   }
@@ -182,6 +347,22 @@ export async function handleStudentCallback(ctx, data) {
     }
 
     const { payload } = await StateService.get(user.id);
+
+    if (payload?.draftQuestion) {
+      const nextPayload = {
+        ...payload,
+        category,
+        description: payload.draftQuestion,
+      };
+
+      await StateService.set(user.id, FSM_STATES.WAITING_CONFIRMATION, nextPayload);
+      await MaxService.sendMessage(
+        recipient,
+        buildTicketSummary(nextPayload),
+        getConfirmationKeyboard(),
+      );
+      return true;
+    }
 
     await StateService.set(user.id, FSM_STATES.WAITING_DESCRIPTION, {
       ...payload,

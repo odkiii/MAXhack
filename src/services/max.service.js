@@ -46,6 +46,45 @@ export class MaxService {
       });
     }
   }
+
+  static async updateCallbackMessage(callbackQuery, text, keyboard = null) {
+    const callbackId = callbackQuery?.id;
+
+    if (!callbackId || !process.env.MAX_BOT_TOKEN) {
+      return { ok: true, mock: true };
+    }
+
+    try {
+      return await answerCallback(callbackId, {
+        message: {
+          text,
+          ...(keyboard?.inline_keyboard
+            ? {
+                attachments: [
+                  {
+                    type: "inline_keyboard",
+                    payload: {
+                      buttons: keyboard.inline_keyboard.map((row) =>
+                        row.map((btn) => ({
+                          type: "callback",
+                          text: btn.text,
+                          payload: btn.callback_data ?? btn.payload,
+                        })),
+                      ),
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
+      });
+    } catch (error) {
+      console.error("[MAX API] callback message update failed", {
+        status: error.status,
+        data: error.data,
+      });
+    }
+  }
 }
 
 function resolveRecipient(target) {

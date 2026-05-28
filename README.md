@@ -18,6 +18,7 @@
 - `MAX_API_URL`
 - `MAX_WEBHOOK_URL`
 - `MAX_WEBHOOK_SECRET`
+- `ADMIN_MAX_USER_ID`
 
 ## Локальный запуск
 

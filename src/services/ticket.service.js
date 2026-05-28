@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { TICKET_STATUSES } from "@/bot/constants/statuses";
 import { buildTicketTitle } from "@/bot/helpers/ticket-format";
 import { TicketEventService } from "@/services/ticket-event.service";
+import { getTeacherByMaxUserId, TEACHERS } from "@/bot/constants/categories";
 
 export class TicketService {
   static async create(data) {
@@ -88,6 +89,135 @@ export class TicketService {
       take: limit,
       include: { student: true },
     });
+  }
+
+  static async findSimilarClosedTicket(question) {
+    const normalized = normalizeForSearch(question);
+
+    if (!normalized) {
+      return null;
+    }
+
+    const closedTickets = await prisma.ticket.findMany({
+      where: { status: TICKET_STATUSES.CLOSED },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      include: { teacher: true },
+    });
+
+    let best = null;
+
+    for (const ticket of closedTickets) {
+      const haystack = normalizeForSearch(
+        [ticket.title, ticket.description, ticket.teacherResponse]
+          .filter(Boolean)
+          .join(" "),
+      );
+      const score = tokenOverlapScore(normalized, haystack);
+
+      if (score > 0 && (!best || score > best.score)) {
+        best = { ticket, score };
+      }
+    }
+
+    if (!best || best.score < 2) {
+      return null;
+    }
+
+    return best.ticket;
+  }
+
+  static async recommendTeachersByQuestion(question, limit = 3) {
+    const normalized = normalizeForSearch(question);
+
+    if (!normalized) {
+      return [];
+    }
+
+    const closedTickets = await prisma.ticket.findMany({
+      where: {
+        status: TICKET_STATUSES.CLOSED,
+        teacherId: { not: null },
+      },
+      include: { teacher: true },
+      take: 400,
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const scores = new Map();
+
+    for (const ticket of closedTickets) {
+      if (!ticket.teacher?.maxUserId) {
+        continue;
+      }
+
+      const teacherMeta = getTeacherByMaxUserId(ticket.teacher.maxUserId);
+
+      if (!teacherMeta) {
+        continue;
+      }
+
+      const haystack = normalizeForSearch(
+        [ticket.title, ticket.description, ticket.teacherResponse]
+          .filter(Boolean)
+          .join(" "),
+      );
+      const score = tokenOverlapScore(normalized, haystack);
+
+      if (score <= 0) {
+        continue;
+      }
+
+      const prev = scores.get(teacherMeta.key) ?? {
+        teacher: teacherMeta,
+        score: 0,
+        closedSimilarCount: 0,
+      };
+      prev.score += score;
+      prev.closedSimilarCount += 1;
+      scores.set(teacherMeta.key, prev);
+    }
+
+    const ranked = [...scores.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    if (ranked.length > 0) {
+      return ranked;
+    }
+
+    const closedCounts = await prisma.ticket.groupBy({
+      by: ["teacherId"],
+      where: {
+        status: TICKET_STATUSES.CLOSED,
+        teacherId: { not: null },
+      },
+      _count: true,
+    });
+
+    const countByTeacherId = new Map(
+      closedCounts.map((item) => [item.teacherId, item._count]),
+    );
+
+    const users = await prisma.user.findMany({
+      where: { role: "TEACHER" },
+      select: { id: true, maxUserId: true },
+    });
+
+    const teacherIdByMaxUserId = new Map(
+      users.map((u) => [String(u.maxUserId), u.id]),
+    );
+
+    return TEACHERS.map((teacher) => {
+      const teacherId = teacherIdByMaxUserId.get(String(teacher.maxUserId));
+      return {
+        teacher,
+        score: 0,
+        closedSimilarCount: teacherId ? countByTeacherId.get(teacherId) ?? 0 : 0,
+      };
+    })
+      .sort((a, b) => b.closedSimilarCount - a.closedSimilarCount)
+      .slice(0, limit);
   }
 
   static async accept(ticketId, teacherId) {
@@ -308,4 +438,50 @@ export class TicketService {
 
     return ticket;
   }
+}
+
+function normalizeForSearch(text) {
+  return String(text ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenOverlapScore(needle, haystack) {
+  if (!needle || !haystack) {
+    return 0;
+  }
+
+  const stopWords = new Set([
+    "и",
+    "в",
+    "на",
+    "по",
+    "с",
+    "что",
+    "это",
+    "не",
+    "нет",
+    "для",
+    "как",
+    "к",
+    "из",
+    "а",
+    "или",
+    "у",
+    "я",
+  ]);
+
+  const needleTokens = [...new Set(needle.split(" ").filter((t) => t.length > 2 && !stopWords.has(t)))];
+  const haystackSet = new Set(haystack.split(" ").filter(Boolean));
+  let score = 0;
+
+  for (const token of needleTokens) {
+    if (haystackSet.has(token)) {
+      score += 1;
+    }
+  }
+
+  return score;
 }

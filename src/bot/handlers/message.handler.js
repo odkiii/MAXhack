@@ -3,7 +3,10 @@ import { TicketService } from "@/services/ticket.service";
 import { MaxService } from "@/services/max.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
-import { getConfirmationKeyboard } from "@/bot/keyboards/ticket.keyboard";
+import {
+  getConfirmationKeyboard,
+  getSimilarDecisionKeyboard,
+} from "@/bot/keyboards/ticket.keyboard";
 import { CATEGORY_LABELS, getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
@@ -39,6 +42,47 @@ export async function messageHandler(ctx) {
 
   const { state, payload } = await StateService.get(user.id);
   const role = resolveMenuRole(user);
+
+  if (state === FSM_STATES.WAITING_QUESTION_INPUT && role === ROLES.STUDENT) {
+    const draftQuestion = text?.trim();
+
+    if (!draftQuestion) {
+      await MaxService.sendMessage(
+        ctx.recipient,
+        "Пожалуйста, отправьте вопрос одним сообщением.",
+      );
+      return;
+    }
+
+    const similar = await TicketService.findSimilarClosedTicket(draftQuestion);
+
+    if (similar) {
+      const daysAgo = getDaysAgoLabel(similar.updatedAt);
+      const answer = similar.teacherResponse ?? "Ответ не сохранён.";
+
+      await StateService.set(user.id, FSM_STATES.WAITING_SIMILAR_DECISION, {
+        draftQuestion,
+        similarTicketId: similar.id,
+      });
+
+      await MaxService.sendMessage(
+        ctx.recipient,
+        `💡 Похожий вопрос уже решали:\n\nТикет #${similar.ticketNumber} · ${CATEGORY_LABELS[similar.category] ?? similar.category} · закрыт ${daysAgo}\nВопрос: «${similar.description}»\nОтвет: «${answer}»`,
+        getSimilarDecisionKeyboard(),
+      );
+      return;
+    }
+
+    await StateService.set(user.id, FSM_STATES.WAITING_SIMILAR_DECISION, {
+      draftQuestion,
+    });
+    await MaxService.sendMessage(
+      ctx.recipient,
+      "Похожих решений не найдено. Нажмите «Создать тикет».",
+      getSimilarDecisionKeyboard(),
+    );
+    return;
+  }
 
   if (state === FSM_STATES.WAITING_DESCRIPTION && role === ROLES.STUDENT) {
     const description = text?.trim();
@@ -257,4 +301,21 @@ export async function messageHandler(ctx) {
     "Используйте меню или команду /start.",
   );
   await showMainMenu(ctx);
+}
+
+function getDaysAgoLabel(dateValue) {
+  if (!dateValue) {
+    return "недавно";
+  }
+
+  const diffMs = Date.now() - new Date(dateValue).getTime();
+  const days = Math.max(1, Math.floor(diffMs / 86400000));
+
+  if (days % 10 === 1 && days % 100 !== 11) {
+    return `${days} день назад`;
+  }
+  if ([2, 3, 4].includes(days % 10) && ![12, 13, 14].includes(days % 100)) {
+    return `${days} дня назад`;
+  }
+  return `${days} дней назад`;
 }

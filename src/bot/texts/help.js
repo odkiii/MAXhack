@@ -1,5 +1,3 @@
-import { LEGAL_URL, PRIVACY_URL, TEAM_NAME } from "@/bot/texts/legal";
-
 export const HELP_TEXT = `Помощь
 
 Студент:
@@ -12,8 +10,6 @@ export const HELP_TEXT = `Помощь
 • Активные / закрытые тикеты
 • Принять, уточнить, ответить, закрыть с итогом
 
-Разработчик: ${TEAM_NAME}
-${LEGAL_URL}
-${PRIVACY_URL}
+Разработчик: команда "Телеграм" от РТУ МИРЭА
 
 Команда: /start — главное меню`;

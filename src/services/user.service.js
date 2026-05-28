@@ -10,6 +10,9 @@ export class UserService {
     const effectiveRole = isConfiguredTeacher(maxUserId)
       ? ROLES.TEACHER
       : role;
+    const effectiveVerification = isConfiguredTeacher(maxUserId)
+      ? "APPROVED"
+      : "NONE";
 
     const existing = await prisma.user.findUnique({
       where: { maxUserId },
@@ -24,6 +27,14 @@ export class UserService {
 
       if (isConfiguredTeacher(maxUserId) && existing.role !== ROLES.TEACHER) {
         updates.role = ROLES.TEACHER;
+      }
+
+      if (
+        isConfiguredTeacher(maxUserId) &&
+        existing.teacherVerificationStatus !== "APPROVED"
+      ) {
+        updates.teacherVerificationStatus = "APPROVED";
+        updates.teacherVerificationApprovedAt = new Date();
       }
 
       if (Object.keys(updates).length > 0) {
@@ -41,6 +52,9 @@ export class UserService {
         maxUserId,
         displayName,
         role: effectiveRole,
+        teacherVerificationStatus: effectiveVerification,
+        teacherVerificationApprovedAt:
+          effectiveVerification === "APPROVED" ? new Date() : null,
       },
     });
   }
@@ -48,6 +62,49 @@ export class UserService {
   static async findByMaxUserId(maxUserId) {
     return prisma.user.findUnique({
       where: { maxUserId: String(maxUserId) },
+    });
+  }
+
+  static async findById(id) {
+    return prisma.user.findUnique({ where: { id } });
+  }
+
+  static async setRoleStudent(userId) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { role: ROLES.STUDENT },
+    });
+  }
+
+  static async requestTeacherVerification(userId) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: ROLES.TEACHER,
+        teacherVerificationStatus: "PENDING",
+        teacherVerificationRequestedAt: new Date(),
+      },
+    });
+  }
+
+  static async approveTeacherVerification(userId) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: ROLES.TEACHER,
+        teacherVerificationStatus: "APPROVED",
+        teacherVerificationApprovedAt: new Date(),
+      },
+    });
+  }
+
+  static async rejectTeacherVerification(userId) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: ROLES.STUDENT,
+        teacherVerificationStatus: "REJECTED",
+      },
     });
   }
 }

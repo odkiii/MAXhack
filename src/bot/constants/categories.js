@@ -21,16 +21,19 @@ export const TEACHERS = [
     key: "teacher_1",
     maxUserId: "max_teacher_1",
     displayName: "Анна Смирнова",
+    expertise: "DevOps, контейнеры",
   },
   {
     key: "teacher_2",
     maxUserId: "max_teacher_2",
     displayName: "Иван Петров",
+    expertise: "Linux, сети",
   },
   {
     key: "teacher_3",
     maxUserId: "max_teacher_3",
     displayName: "Мария Козлова",
+    expertise: "Репозитории, Git",
   },
 ];
 

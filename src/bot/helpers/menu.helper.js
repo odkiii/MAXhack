@@ -6,7 +6,18 @@ import { getTeacherMenuKeyboard } from "@/bot/keyboards/teacher.menu.keyboard";
 import { HELP_TEXT } from "@/bot/texts/help";
 
 export function resolveMenuRole(user) {
-  if (user.role === ROLES.TEACHER || user.role === ROLES.MODERATOR) {
+  if (user.role === ROLES.ADMIN) {
+    return ROLES.ADMIN;
+  }
+
+  if (user.role === ROLES.MODERATOR) {
+    return ROLES.MODERATOR;
+  }
+
+  if (
+    user.role === ROLES.TEACHER &&
+    user.teacherVerificationStatus === "APPROVED"
+  ) {
     return user.role;
   }
 
