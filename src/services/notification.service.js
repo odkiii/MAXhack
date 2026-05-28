@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { MaxService } from "@/services/max.service";
+import { canDeliverMaxNotification } from "@/bot/constants/categories";
 
 const NOTIFICATION_PREFIX = "🔔 ";
 
@@ -23,16 +24,30 @@ export class NotificationService {
       return null;
     }
 
-    return MaxService.sendMessage(
-      {
-        userId: Number(maxUserId) || maxUserId,
-        chatType: "dialog",
-        chatId: null,
-      },
-      formatNotificationText(text),
-      keyboard,
-      mediaAttachments,
-    );
+    if (!canDeliverMaxNotification(maxUserId)) {
+      console.log("[notify] skipped — not a real MAX user id:", maxUserId);
+      return { ok: true, skipped: true };
+    }
+
+    try {
+      return await MaxService.sendMessage(
+        {
+          userId: Number(maxUserId) || maxUserId,
+          chatType: "dialog",
+          chatId: null,
+        },
+        formatNotificationText(text),
+        keyboard,
+        mediaAttachments,
+      );
+    } catch (error) {
+      console.error("[notify] failed", {
+        maxUserId,
+        status: error.status,
+        data: error.data,
+      });
+      return { ok: false, error };
+    }
   }
 
   static async notifyUserId(userId, text, keyboard = null, mediaAttachments = null) {

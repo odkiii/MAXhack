@@ -60,3 +60,14 @@ export function getTeacherByMaxUserId(maxUserId) {
 export function isConfiguredTeacher(maxUserId) {
   return Boolean(getTeacherByMaxUserId(maxUserId));
 }
+
+/** DEMO: catalog/mock teachers use string ids like "teacher_krasnoslobodtseva" — MAX API cannot deliver to them. */
+export function canDeliverMaxNotification(maxUserId) {
+  if (maxUserId == null) {
+    return false;
+  }
+
+  const value = String(maxUserId).trim();
+
+  return /^\d+$/.test(value);
+}
