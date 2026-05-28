@@ -107,4 +107,11 @@ export class UserService {
       },
     });
   }
+
+  static async listPendingTeacherVerifications() {
+    return prisma.user.findMany({
+      where: { teacherVerificationStatus: "PENDING" },
+      orderBy: { teacherVerificationRequestedAt: "asc" },
+    });
+  }
 }

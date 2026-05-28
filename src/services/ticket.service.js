@@ -6,7 +6,8 @@ import { getTeacherByMaxUserId, TEACHERS } from "@/bot/constants/categories";
 
 export class TicketService {
   static async create(data) {
-    const { studentId, teacherId, category, description } = data;
+    const { studentId, teacherId, description } = data;
+    const category = "OTHER";
     const title = buildTicketTitle(description);
 
     const ticket = await prisma.ticket.create({

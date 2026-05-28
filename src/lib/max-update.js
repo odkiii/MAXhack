@@ -155,6 +155,10 @@ function normalizeMessageCallback(raw) {
       from,
       message: {
         chat: { id: recipient.chatId ?? recipient.userId },
+        messageId:
+          raw.message?.body?.mid ??
+          raw.message?.body?.message_id ??
+          null,
         _maxRecipient: recipient,
       },
     },

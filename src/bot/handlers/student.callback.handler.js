@@ -3,18 +3,14 @@ import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
 import { UserService } from "@/services/user.service";
 import { UserDataService } from "@/services/user-data.service";
-import { MaxService } from "@/services/max.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
 import { ROLES } from "@/bot/constants/roles";
 import {
   getTeacherByKey,
-  TICKET_CATEGORIES,
-  CATEGORY_LABELS,
 } from "@/bot/constants/categories";
 import {
   getTeacherSelectionKeyboard,
-  getCategoriesKeyboard,
   getConfirmationKeyboard,
   getAfterCreateKeyboard,
   getStudentTicketActionsKeyboard,
@@ -31,6 +27,8 @@ import {
 } from "@/bot/texts/legal";
 import { getBackToMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
+import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
+import { appendAdminMenuRow } from "@/bot/helpers/admin.helper";
 import {
   formatTicketCard,
   buildTicketTitle,
@@ -46,12 +44,10 @@ import {
 
 function buildTicketSummary(payload) {
   const teacher = getTeacherByKey(payload.teacherKey);
-  const categoryLabel = CATEGORY_LABELS[payload.category] ?? payload.category;
 
   return `Проверьте обращение:
 
 Преподаватель: ${teacher?.displayName ?? "—"}
-Категория: ${categoryLabel}
 Описание: ${payload.description ?? "—"}
 
 ${PII_WARNING}
@@ -59,14 +55,39 @@ ${PII_WARNING}
 Подтвердите отправку или отмените.`;
 }
 
+async function proceedAfterTeacherSelect(ctx, payload, teacherKey, teacherId) {
+  const nextPayload = {
+    ...payload,
+    teacherKey,
+    teacherId,
+    description: payload.draftQuestion ?? payload.description,
+  };
+
+  if (nextPayload.description) {
+    await StateService.set(ctx.user.id, FSM_STATES.WAITING_CONFIRMATION, nextPayload);
+    await respondFromCallback(
+      ctx,
+      buildTicketSummary(nextPayload),
+      getConfirmationKeyboard(),
+    );
+    return;
+  }
+
+  await StateService.set(ctx.user.id, FSM_STATES.WAITING_DESCRIPTION, nextPayload);
+  await respondFromCallback(
+    ctx,
+    `Кратко опишите вопрос одним сообщением.\n\n${PII_WARNING}`,
+  );
+}
+
 export async function handleStudentCallback(ctx, data) {
-  const { user, recipient } = ctx;
+  const { user } = ctx;
 
   if (data === "accept_consent") {
     await ConsentService.accept(user.id);
     await StateService.clear(user.id);
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Выберите роль для работы с ботом:",
       getRoleSelectionKeyboard(),
     );
@@ -74,7 +95,7 @@ export async function handleStudentCallback(ctx, data) {
   }
 
   if (data === "show_legal") {
-    await MaxService.sendMessage(recipient, SERVICE_INTRO, getConsentKeyboard());
+    await respondFromCallback(ctx, SERVICE_INTRO, getConsentKeyboard());
     return true;
   }
 
@@ -100,16 +121,16 @@ export async function handleStudentCallback(ctx, data) {
     }
 
     if (user.teacherVerificationStatus === "PENDING") {
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "Ваш запрос на подтверждение преподавателя уже отправлен и ожидает решения администратора.",
         getRoleSelectionKeyboard(),
       );
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       TEACHER_VERIFICATION_TEXT,
       getTeacherVerificationRequestKeyboard(),
     );
@@ -128,8 +149,8 @@ export async function handleStudentCallback(ctx, data) {
       );
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Запрос отправлен администратору. После подтверждения вы сможете принимать тикеты студентов.",
       getRoleSelectionKeyboard(),
     );
@@ -143,8 +164,8 @@ export async function handleStudentCallback(ctx, data) {
 
   if (data === "create_ticket") {
     await StateService.set(user.id, FSM_STATES.WAITING_QUESTION_INPUT, {});
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Опишите вопрос одним сообщением. Я сначала проверю похожие уже решенные обращения.",
     );
     return true;
@@ -152,15 +173,10 @@ export async function handleStudentCallback(ctx, data) {
 
   if (data === "similar_helped") {
     await StateService.clear(user.id);
-    await MaxService.updateCallbackMessage(
-      ctx.callbackQuery,
-      "Вопрос закрыт без создания тикета.",
-      getBackToMenuKeyboard(),
-    );
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Отлично, рад что помогло. Новый тикет не создавался.",
-      getBackToMenuKeyboard(),
+      appendAdminMenuRow(getBackToMenuKeyboard(), user),
     );
     return true;
   }
@@ -170,21 +186,16 @@ export async function handleStudentCallback(ctx, data) {
     const draftQuestion = payload.draftQuestion ?? "";
 
     if (state !== FSM_STATES.WAITING_SIMILAR_DECISION || !draftQuestion) {
-      await MaxService.sendMessage(recipient, "Сначала отправьте вопрос.");
+      await respondFromCallback(ctx, "Сначала отправьте вопрос.");
       return true;
     }
-
-    await MaxService.updateCallbackMessage(
-      ctx.callbackQuery,
-      "Переходим к созданию тикета…",
-    );
 
     const recommended = await TicketService.recommendTeachersByQuestion(draftQuestion, 3);
 
     if (recommended.length === 0) {
       await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, { draftQuestion });
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "Похожих решенных вопросов не найдено. Выберите преподавателя:",
         getTeacherSelectionKeyboard(),
       );
@@ -203,8 +214,8 @@ export async function handleStudentCallback(ctx, data) {
       recommendedTeacherKeys: recommended.map((r) => r.teacher.key),
     });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `По теме вашего вопроса подойдут:\n\n${recommendationText}`,
       getRecommendedTeachersKeyboard(recommended.map((r) => r.teacher)),
     );
@@ -214,8 +225,8 @@ export async function handleStudentCallback(ctx, data) {
   if (data === "manual_teacher_select") {
     const { payload } = await StateService.get(user.id);
     await StateService.set(user.id, FSM_STATES.WAITING_TEACHER, payload ?? {});
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Выберите преподавателя из справочника:",
       getTeacherSelectionKeyboard(),
     );
@@ -227,7 +238,7 @@ export async function handleStudentCallback(ctx, data) {
     const teacherData = getTeacherByKey(key);
 
     if (!teacherData) {
-      await MaxService.sendMessage(recipient, "Преподаватель не найден.");
+      await respondFromCallback(ctx, "Преподаватель не найден.");
       return true;
     }
 
@@ -237,16 +248,11 @@ export async function handleStudentCallback(ctx, data) {
     );
     const { payload } = await StateService.get(user.id);
 
-    await StateService.set(user.id, FSM_STATES.WAITING_CATEGORY, {
-      ...payload,
-      teacherKey: teacherData.key,
-      teacherId: teacher.id,
-    });
-
-    await MaxService.sendMessage(
-      recipient,
-      "Выберите категорию обращения:",
-      getCategoriesKeyboard(),
+    await proceedAfterTeacherSelect(
+      ctx,
+      payload ?? {},
+      teacherData.key,
+      teacher.id,
     );
     return true;
   }
@@ -255,10 +261,10 @@ export async function handleStudentCallback(ctx, data) {
     const tickets = await TicketService.listByStudent(user.id);
 
     if (tickets.length === 0) {
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "У вас пока нет обращений.",
-        getBackToMenuKeyboard(),
+        appendAdminMenuRow(getBackToMenuKeyboard(), user),
       );
       return true;
     }
@@ -268,28 +274,31 @@ export async function handleStudentCallback(ctx, data) {
       .map((t) => formatTicketCard(t))
       .join("\n\n—\n\n");
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Ваши обращения:\n\n${lines}`,
-      {
-        inline_keyboard: [
-          ...tickets.slice(0, 8).map((t) => [
-            {
-              text: `#${t.ticketNumber} · ${STATUS_LABELS[t.status]}`,
-              callback_data: `st_view_${t.id}`,
-            },
-          ]),
-          [{ text: "В главное меню", callback_data: "main_menu" }],
-        ],
-      },
+      appendAdminMenuRow(
+        {
+          inline_keyboard: [
+            ...tickets.slice(0, 8).map((t) => [
+              {
+                text: `#${t.ticketNumber} · ${STATUS_LABELS[t.status]}`,
+                callback_data: `st_view_${t.id}`,
+              },
+            ]),
+            [{ text: "В главное меню", callback_data: "main_menu" }],
+          ],
+        },
+        user,
+      ),
     );
     return true;
   }
 
   if (data === "delete_data") {
     await StateService.set(user.id, FSM_STATES.WAITING_DELETE_CONFIRM, {});
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       DELETE_DATA_PREVIEW,
       getDeleteConfirmKeyboard(),
     );
@@ -300,13 +309,13 @@ export async function handleStudentCallback(ctx, data) {
     const { state } = await StateService.get(user.id);
 
     if (state !== FSM_STATES.WAITING_DELETE_CONFIRM) {
-      await MaxService.sendMessage(recipient, "Подтверждение удаления не активно.");
+      await respondFromCallback(ctx, "Подтверждение удаления не активно.");
       return true;
     }
 
     await UserDataService.deleteAllUserData(user.id);
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Ваши данные в сервисе удалены. Чтобы снова пользоваться ботом, отправьте /start.",
     );
     return true;
@@ -316,7 +325,7 @@ export async function handleStudentCallback(ctx, data) {
     const teacherMeta = getTeacherByKey(data);
 
     if (!teacherMeta) {
-      await MaxService.sendMessage(recipient, "Преподаватель не найден.");
+      await respondFromCallback(ctx, "Преподаватель не найден.");
       return true;
     }
 
@@ -325,53 +334,11 @@ export async function handleStudentCallback(ctx, data) {
       ROLES.TEACHER,
     );
 
-    await StateService.set(user.id, FSM_STATES.WAITING_CATEGORY, {
-      teacherKey: data,
-      teacherId: teacher.id,
-    });
-
-    await MaxService.sendMessage(
-      recipient,
-      "Выберите категорию обращения:",
-      getCategoriesKeyboard(),
-    );
-    return true;
-  }
-
-  if (data.startsWith("category_")) {
-    const category = data.replace("category_", "");
-
-    if (!Object.values(TICKET_CATEGORIES).includes(category)) {
-      await MaxService.sendMessage(recipient, "Некорректная категория.");
-      return true;
-    }
-
-    const { payload } = await StateService.get(user.id);
-
-    if (payload?.draftQuestion) {
-      const nextPayload = {
-        ...payload,
-        category,
-        description: payload.draftQuestion,
-      };
-
-      await StateService.set(user.id, FSM_STATES.WAITING_CONFIRMATION, nextPayload);
-      await MaxService.sendMessage(
-        recipient,
-        buildTicketSummary(nextPayload),
-        getConfirmationKeyboard(),
-      );
-      return true;
-    }
-
-    await StateService.set(user.id, FSM_STATES.WAITING_DESCRIPTION, {
-      ...payload,
-      category,
-    });
-
-    await MaxService.sendMessage(
-      recipient,
-      `Кратко опишите вопрос одним сообщением.\n\n${PII_WARNING}`,
+    await proceedAfterTeacherSelect(
+      ctx,
+      (await StateService.get(user.id)).payload ?? {},
+      data,
+      teacher.id,
     );
     return true;
   }
@@ -380,8 +347,8 @@ export async function handleStudentCallback(ctx, data) {
     const { state, payload } = await StateService.get(user.id);
 
     if (state !== FSM_STATES.WAITING_CONFIRMATION) {
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "Нет активного обращения для подтверждения.",
       );
       return true;
@@ -394,8 +361,8 @@ export async function handleStudentCallback(ctx, data) {
       );
 
       if (existing) {
-        await MaxService.sendMessage(
-          recipient,
+        await respondFromCallback(
+          ctx,
           `Обращение уже создано.
 
 #${existing.ticketNumber}
@@ -406,9 +373,9 @@ export async function handleStudentCallback(ctx, data) {
       }
     }
 
-    if (!payload.teacherId || !payload.category || !payload.description) {
-      await MaxService.sendMessage(
-        recipient,
+    if (!payload.teacherId || !payload.description) {
+      await respondFromCallback(
+        ctx,
         "Не хватает данных. Начните заново: /start",
       );
       await StateService.clear(user.id);
@@ -418,7 +385,6 @@ export async function handleStudentCallback(ctx, data) {
     const ticket = await TicketService.create({
       studentId: user.id,
       teacherId: payload.teacherId,
-      category: payload.category,
       description: payload.description,
     });
 
@@ -430,12 +396,11 @@ export async function handleStudentCallback(ctx, data) {
 
     const teacher = getTeacherByKey(payload.teacherKey);
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Обращение #${ticket.ticketNumber} создано.
 
 Преподаватель: ${teacher?.displayName ?? "—"}
-Категория: ${CATEGORY_LABELS[payload.category]}
 Статус: ${STATUS_LABELS[ticket.status]}`,
       getAfterCreateKeyboard(ticket.id),
     );
@@ -443,7 +408,6 @@ export async function handleStudentCallback(ctx, data) {
     await NotificationService.notifyUserId(
       ticket.teacherId,
       `Новое обращение #${ticket.ticketNumber}
-${CATEGORY_LABELS[ticket.category]}
 ${ticket.title ?? buildTicketTitle(ticket.description)}`,
       {
         inline_keyboard: [
@@ -457,7 +421,6 @@ ${ticket.title ?? buildTicketTitle(ticket.description)}`,
 
   if (data === "cancel_ticket") {
     await StateService.clear(user.id);
-    await MaxService.sendMessage(recipient, "Создание обращения отменено.");
     await showMainMenu(ctx);
     return true;
   }
@@ -467,12 +430,12 @@ ${ticket.title ?? buildTicketTitle(ticket.description)}`,
     const ticket = await TicketService.findByIdForStudent(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Обращение не найдено.");
+      await respondFromCallback(ctx, "Обращение не найдено.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       formatTicketCard(ticket, { full: true }),
       getStudentTicketActionsKeyboard(ticket),
     );
@@ -484,7 +447,7 @@ ${ticket.title ?? buildTicketTitle(ticket.description)}`,
     const ticket = await TicketService.findByIdForStudent(ticketId, user.id);
 
     if (!ticket || ticket.status !== "AWAITING_CLARIFICATION") {
-      await MaxService.sendMessage(recipient, "Уточнение по этому обращению не ожидается.");
+      await respondFromCallback(ctx, "Уточнение по этому обращению не ожидается.");
       return true;
     }
 
@@ -496,8 +459,8 @@ ${ticket.title ?? buildTicketTitle(ticket.description)}`,
       ticketId,
     });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Ответьте на уточнение одним сообщением.
 
 Нужно:
@@ -512,12 +475,12 @@ ${ticket.clarificationComment ? `\nКомментарий преподавате
     const ticket = await TicketService.studentCloseAsResolved(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Не удалось закрыть обращение.");
+      await respondFromCallback(ctx, "Не удалось закрыть обращение.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Обращение #${ticket.ticketNumber} закрыто.`,
       getStudentTicketActionsKeyboard(ticket),
     );
@@ -535,7 +498,7 @@ ${ticket.clarificationComment ? `\nКомментарий преподавате
     const slots = Array.isArray(ticket?.proposedSlots) ? ticket.proposedSlots : [];
 
     if (!ticket || slots.length === 0) {
-      await MaxService.sendMessage(recipient, "Слоты для выбора недоступны.");
+      await respondFromCallback(ctx, "Слоты для выбора недоступны.");
       return true;
     }
 
@@ -544,8 +507,8 @@ ${ticket.clarificationComment ? `\nКомментарий преподавате
       slots,
     });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Выберите удобный слот консультации:",
       getSlotSelectionKeyboard(ticketId, slots),
     );
@@ -566,15 +529,15 @@ ${ticket.clarificationComment ? `\nКомментарий преподавате
     const slot = slotList[slotIndex];
 
     if (!slot) {
-      await MaxService.sendMessage(recipient, "Слот не найден.");
+      await respondFromCallback(ctx, "Слот не найден.");
       return true;
     }
 
     const ticket = await TicketService.selectSlot(ticketId, user.id, slot);
     await StateService.clear(user.id);
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Выбран слот: ${slot}
 Обращение #${ticket.ticketNumber}, статус: ${STATUS_LABELS[ticket.status]}`,
     );
@@ -601,12 +564,12 @@ ${ticket.clarificationComment ? `\nКомментарий преподавате
     );
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Оценка недоступна для этого обращения.");
+      await respondFromCallback(ctx, "Оценка недоступна для этого обращения.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Спасибо за оценку. Она учитывается только как метрика качества.",
     );
     return true;

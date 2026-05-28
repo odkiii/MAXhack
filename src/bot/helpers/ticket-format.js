@@ -1,4 +1,3 @@
-import { CATEGORY_LABELS } from "@/bot/constants/categories";
 import {
   STATUS_LABELS,
   CLOSE_OUTCOME_LABELS,
@@ -12,14 +11,13 @@ export function buildTicketTitle(description) {
 }
 
 export function formatTicketCard(ticket, { full = false } = {}) {
-  const category = CATEGORY_LABELS[ticket.category] ?? ticket.category;
   const status = STATUS_LABELS[ticket.status] ?? ticket.status;
   const title = ticket.title ?? buildTicketTitle(ticket.description);
   const created = ticket.createdAt
     ? new Date(ticket.createdAt).toLocaleString("ru-RU")
     : "—";
 
-  let text = `#${ticket.ticketNumber} · ${category}
+  let text = `#${ticket.ticketNumber}
 Статус: ${status}
 Кратко: ${title}
 Создан: ${created}`;

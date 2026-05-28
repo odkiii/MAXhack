@@ -1,7 +1,40 @@
-import { sendMessage, answerCallback } from "@/lib/max-api";
+import { sendMessage, answerCallback, deleteMessage as deleteMessageApi } from "@/lib/max-api";
 import { toMaxAttachments } from "@/lib/max-keyboard";
 
 export class MaxService {
+  static getCallbackMessageId(callbackQuery) {
+    return callbackQuery?.message?.messageId ?? null;
+  }
+
+  static async deleteMessage(messageId) {
+    if (!messageId || !process.env.MAX_BOT_TOKEN) {
+      return { ok: true, mock: true };
+    }
+
+    try {
+      const result = await deleteMessageApi(messageId);
+      console.log("[MAX API] deleted", { messageId });
+      return result;
+    } catch (error) {
+      console.error("[MAX API] delete failed", {
+        messageId,
+        status: error.status,
+        data: error.data,
+      });
+    }
+  }
+
+  static async replyFromCallback(callbackQuery, recipient, text, keyboard = null) {
+    const result = await MaxService.sendMessage(recipient, text, keyboard);
+    const messageId = MaxService.getCallbackMessageId(callbackQuery);
+
+    if (messageId) {
+      await MaxService.deleteMessage(messageId);
+    }
+
+    return result;
+  }
+
   static async sendMessage(target, text, keyboard = null) {
     const recipient = resolveRecipient(target);
     const attachments = toMaxAttachments(keyboard);

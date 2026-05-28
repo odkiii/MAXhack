@@ -1,6 +1,5 @@
 import { StateService } from "@/services/state.service";
 import { TicketService } from "@/services/ticket.service";
-import { MaxService } from "@/services/max.service";
 import { NotificationService } from "@/services/notification.service";
 import { FSM_STATES } from "@/bot/states/user.states";
 import { TICKET_STATUSES, CLOSE_OUTCOMES, CLOSE_OUTCOME_LABELS, STATUS_LABELS } from "@/bot/constants/statuses";
@@ -13,12 +12,13 @@ import {
 } from "@/bot/keyboards/teacher.ticket.keyboard";
 import { getFeedbackKeyboard } from "@/bot/keyboards/feedback.keyboard";
 import { showMainMenu, showHelp } from "@/bot/helpers/menu.helper";
+import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 import { formatTicketCard } from "@/bot/helpers/ticket-format";
 import { CLARIFICATION_LABELS } from "@/bot/constants/clarifications";
 import { prisma } from "@/lib/prisma";
 
 export async function handleTeacherCallback(ctx, data) {
-  const { user, recipient } = ctx;
+  const { user } = ctx;
 
   if (data === "help") {
     await showHelp(ctx);
@@ -42,8 +42,8 @@ export async function handleTeacherCallback(ctx, data) {
       .map((c) => `${STATUS_LABELS[c.status] ?? c.status}: ${c._count}`)
       .join("\n");
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Диагностика (ваши тикеты):\n${lines || "Нет данных"}`,
     );
     return true;
@@ -53,12 +53,12 @@ export async function handleTeacherCallback(ctx, data) {
     const tickets = await TicketService.listNewByTeacher(user.id);
 
     if (tickets.length === 0) {
-      await MaxService.sendMessage(recipient, "Очередь пуста — новых обращений нет.");
+      await respondFromCallback(ctx, "Очередь пуста — новых обращений нет.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Новые обращения (${tickets.length}):`,
       getTicketListKeyboard(tickets, "t_view"),
     );
@@ -69,12 +69,12 @@ export async function handleTeacherCallback(ctx, data) {
     const tickets = await TicketService.listActiveByTeacher(user.id);
 
     if (tickets.length === 0) {
-      await MaxService.sendMessage(recipient, "Активных тикетов нет.");
+      await respondFromCallback(ctx, "Активных тикетов нет.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Активные тикеты (${tickets.length}):`,
       getTicketListKeyboard(tickets, "t_view"),
     );
@@ -85,12 +85,12 @@ export async function handleTeacherCallback(ctx, data) {
     const tickets = await TicketService.listClosedByTeacher(user.id);
 
     if (tickets.length === 0) {
-      await MaxService.sendMessage(recipient, "Закрытых тикетов пока нет.");
+      await respondFromCallback(ctx, "Закрытых тикетов пока нет.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Закрытые тикеты (последние ${tickets.length}):`,
       getTicketListKeyboard(tickets, "t_view"),
     );
@@ -102,12 +102,12 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.findByIdForTeacher(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Тикет не найден или вам не назначен.");
+      await respondFromCallback(ctx, "Тикет не найден или вам не назначен.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       formatTicketCard(ticket, { full: true }),
       getTeacherTicketActionsKeyboard(ticket.id, ticket.status),
     );
@@ -119,12 +119,12 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.accept(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Не удалось принять тикет.");
+      await respondFromCallback(ctx, "Не удалось принять тикет.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Тикет #${ticket.ticketNumber} принят в работу.`,
       getTeacherTicketActionsKeyboard(ticket.id, ticket.status),
     );
@@ -146,7 +146,7 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.findByIdForTeacher(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Тикет не найден.");
+      await respondFromCallback(ctx, "Тикет не найден.");
       return true;
     }
 
@@ -155,8 +155,8 @@ export async function handleTeacherCallback(ctx, data) {
       selectedTypes: [],
     });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Выберите типы уточнения (можно несколько), затем «Готово»:",
       getClarificationTypesKeyboard(ticketId, []),
     );
@@ -169,12 +169,12 @@ export async function handleTeacherCallback(ctx, data) {
       const { state, payload } = await StateService.get(user.id);
 
       if (state !== FSM_STATES.WAITING_CLARIFY_TYPES || payload.ticketId !== ticketId) {
-        await MaxService.sendMessage(recipient, "Сначала выберите типы уточнения.");
+        await respondFromCallback(ctx, "Сначала выберите типы уточнения.");
         return true;
       }
 
       if (!payload.selectedTypes?.length) {
-        await MaxService.sendMessage(recipient, "Выберите хотя бы один тип уточнения.");
+        await respondFromCallback(ctx, "Выберите хотя бы один тип уточнения.");
         return true;
       }
 
@@ -183,8 +183,8 @@ export async function handleTeacherCallback(ctx, data) {
         selectedTypes: payload.selectedTypes,
       });
 
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "При необходимости добавьте однострочный комментарий или отправьте «-» без комментария:",
       );
       return true;
@@ -219,8 +219,8 @@ export async function handleTeacherCallback(ctx, data) {
       selectedTypes,
     });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       `Выбрано: ${selectedTypes.map((t) => CLARIFICATION_LABELS[t]).join(", ") || "—"}`,
       getClarificationTypesKeyboard(ticketId, selectedTypes),
     );
@@ -232,14 +232,14 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.findByIdForTeacher(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Тикет не найден.");
+      await respondFromCallback(ctx, "Тикет не найден.");
       return true;
     }
 
     await StateService.set(user.id, FSM_STATES.WAITING_TEACHER_REPLY, { ticketId });
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Введите текстовый ответ студенту:",
     );
     return true;
@@ -250,12 +250,12 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.findByIdForTeacher(ticketId, user.id);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Тикет не найден.");
+      await respondFromCallback(ctx, "Тикет не найден.");
       return true;
     }
 
-    await MaxService.sendMessage(
-      recipient,
+    await respondFromCallback(
+      ctx,
       "Выберите итог закрытия:",
       getCloseOutcomeKeyboard(ticketId),
     );
@@ -277,7 +277,7 @@ export async function handleTeacherCallback(ctx, data) {
     );
 
     if (!ticket) {
-      await MaxService.sendMessage(ctx.recipient, "Не удалось закрыть тикет.");
+      await respondFromCallback(ctx, "Не удалось закрыть тикет.");
       return true;
     }
 
@@ -299,7 +299,7 @@ export async function handleTeacherCallback(ctx, data) {
         ticketId,
         outcome,
       });
-      await MaxService.sendMessage(recipient, "Укажите причину отказа одним сообщением:");
+      await respondFromCallback(ctx, "Укажите причину отказа одним сообщением:");
       return true;
     }
 
@@ -308,8 +308,8 @@ export async function handleTeacherCallback(ctx, data) {
         ticketId,
         outcome,
       });
-      await MaxService.sendMessage(
-        recipient,
+      await respondFromCallback(
+        ctx,
         "Укажите слоты консультации через точку с запятой, например:\nВт 14:00; Ср 10:30; Чт 16:00",
       );
       return true;
@@ -318,7 +318,7 @@ export async function handleTeacherCallback(ctx, data) {
     const ticket = await TicketService.close(ticketId, user.id, outcome);
 
     if (!ticket) {
-      await MaxService.sendMessage(recipient, "Не удалось закрыть тикет.");
+      await respondFromCallback(ctx, "Не удалось закрыть тикет.");
       return true;
     }
 
@@ -367,8 +367,8 @@ function parseCloseOutcomeData(data) {
 export async function finalizeClose(ctx, ticket) {
   const label = CLOSE_OUTCOME_LABELS[ticket.closeOutcome] ?? ticket.closeOutcome;
 
-  await MaxService.sendMessage(
-    ctx.recipient,
+  await respondFromCallback(
+    ctx,
     `Тикет #${ticket.ticketNumber} закрыт. Итог: ${label}`,
   );
 

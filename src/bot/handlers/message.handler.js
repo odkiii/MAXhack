@@ -7,7 +7,7 @@ import {
   getConfirmationKeyboard,
   getSimilarDecisionKeyboard,
 } from "@/bot/keyboards/ticket.keyboard";
-import { CATEGORY_LABELS, getTeacherByKey } from "@/bot/constants/categories";
+import { getTeacherByKey } from "@/bot/constants/categories";
 import { startHandler } from "@/bot/handlers/start.handler";
 import { isStartCommand } from "@/lib/max-update";
 import { showMainMenu, resolveMenuRole } from "@/bot/helpers/menu.helper";
@@ -19,12 +19,10 @@ import { PII_WARNING } from "@/bot/texts/legal";
 
 function buildTicketSummary(payload) {
   const teacher = getTeacherByKey(payload.teacherKey);
-  const categoryLabel = CATEGORY_LABELS[payload.category] ?? payload.category;
 
   return `Проверьте обращение:
 
 Преподаватель: ${teacher?.displayName ?? "—"}
-Категория: ${categoryLabel}
 Описание: ${payload.description}
 
 ${PII_WARNING}
@@ -67,7 +65,7 @@ export async function messageHandler(ctx) {
 
       await MaxService.sendMessage(
         ctx.recipient,
-        `💡 Похожий вопрос уже решали:\n\nТикет #${similar.ticketNumber} · ${CATEGORY_LABELS[similar.category] ?? similar.category} · закрыт ${daysAgo}\nВопрос: «${similar.description}»\nОтвет: «${answer}»`,
+        `💡 Похожий вопрос уже решали:\n\nТикет #${similar.ticketNumber} · закрыт ${daysAgo}\nВопрос: «${similar.description}»\nОтвет: «${answer}»`,
         getSimilarDecisionKeyboard(),
       );
       return;

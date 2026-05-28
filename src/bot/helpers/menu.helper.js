@@ -4,6 +4,8 @@ import { isConfiguredTeacher } from "@/bot/constants/categories";
 import { getStudentMenuKeyboard } from "@/bot/keyboards/menu.keyboard";
 import { getTeacherMenuKeyboard } from "@/bot/keyboards/teacher.menu.keyboard";
 import { HELP_TEXT } from "@/bot/texts/help";
+import { appendAdminMenuRow } from "@/bot/helpers/admin.helper";
+import { respondFromCallback } from "@/bot/helpers/callback-response.helper";
 
 export function resolveMenuRole(user) {
   if (user.role === ROLES.ADMIN) {
@@ -33,21 +35,21 @@ export async function showMainMenu(ctx) {
   const name = ctx.user.displayName ?? "пользователь";
 
   if (role === ROLES.TEACHER) {
-    await MaxService.sendMessage(
-      ctx.recipient,
+    await respondFromCallback(
+      ctx,
       `Меню преподавателя. Здравствуйте, ${name}!`,
-      getTeacherMenuKeyboard(),
+      appendAdminMenuRow(getTeacherMenuKeyboard(), ctx.user),
     );
     return;
   }
 
-  await MaxService.sendMessage(
-    ctx.recipient,
+  await respondFromCallback(
+    ctx,
     `Главное меню. Здравствуйте, ${name}!`,
-    getStudentMenuKeyboard(),
+    appendAdminMenuRow(getStudentMenuKeyboard(), ctx.user),
   );
 }
 
 export async function showHelp(ctx) {
-  await MaxService.sendMessage(ctx.recipient, HELP_TEXT);
+  await respondFromCallback(ctx, HELP_TEXT);
 }

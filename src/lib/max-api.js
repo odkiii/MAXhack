@@ -145,6 +145,13 @@ export async function sendMessage(recipient, text, attachments = null) {
   });
 }
 
+export async function deleteMessage(messageId) {
+  return maxApiRequest("/messages", {
+    method: "DELETE",
+    params: { message_id: messageId },
+  });
+}
+
 export async function answerCallback(callbackId, { notification, message } = {}) {
   const body = {};
 
